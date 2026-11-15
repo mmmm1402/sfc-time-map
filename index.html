@@ -14,17 +14,17 @@
     display: grid; grid-template-rows: auto minmax(0,1fr) minmax(0,34dvh); grid-template-areas: "head" "map" "dock";
     height: 100vh; height: 100dvh; overflow: hidden;
   }
-  button, input, select { font: inherit; color: inherit; min-height: 24px; }
+  button { font: inherit; color: inherit; min-height: 24px; }
   button { cursor: pointer; }
-  button:focus-visible, select:focus-visible, #swipe:focus-visible { outline: 2px solid #222; outline-offset: 1px; }
+  button:focus-visible, #swipe:focus-visible { outline: 2px solid #222; outline-offset: 1px; }
   h1, p, .legend-item { overflow-wrap: anywhere; }
 
   header { grid-area: head; padding: 8px 10px; padding-top: max(8px, env(safe-area-inset-top)); border-bottom: 1px solid var(--line); max-height: 29dvh; overflow: auto; }
   h1 { font-size: 14px; font-weight: 600; margin: 0; }
   #rule { margin: 2px 0 6px; font-size: 12px; color: var(--sub); }
-  .modes { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 4px; }
+  .modes { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 4px; }
   .modes button { border: 1px solid var(--line); background: #fff; padding: 4px 2px; }
-  .modes button[aria-pressed="true"], .btn[aria-pressed="true"] { background: #222; border-color: #222; color: #fff; }
+  .modes button[aria-pressed="true"] { background: #222; border-color: #222; color: #fff; }
 
   #mapwrap { grid-area: map; position: relative; min-height: 0; overflow: hidden; }
   #map { position: absolute; inset: 0; z-index: 0; touch-action: none; background: #eee; }
@@ -33,8 +33,6 @@
   #status { position: absolute; z-index: 600; top: 6px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 110px); background: rgba(255,255,255,.9); border: 1px solid var(--line); padding: 1px 8px; font-size: 11px; color: var(--sub); pointer-events: none; text-align: center; }
   #status.none { color: #b00; }
   #home { position: absolute; z-index: 600; right: max(10px, env(safe-area-inset-right)); top: 6px; padding: 0 8px; border: 1px solid var(--line); background: #fff; font-size: 12px; }
-  #lensRing { position: absolute; z-index: 500; pointer-events: none; border-radius: 50%; border: 2px solid #222; transform: translate(-50%, -50%); }
-  #lensRing span { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 4px); white-space: nowrap; background: #fff; border: 1px solid var(--line); font-size: 11px; padding: 0 6px; }
   #swipe { position: absolute; z-index: 500; top: 0; bottom: 0; width: 48px; margin-left: -24px; cursor: ew-resize; touch-action: none; }
   #swipe::before { content: ""; position: absolute; left: 23px; top: 0; bottom: 0; width: 2px; background: #222; }
   #swipe .grip { position: absolute; left: 12px; top: 50%; width: 24px; height: 24px; margin-top: -12px; border-radius: 50%; background: #fff; color: #222; border: 1px solid #222; display: grid; place-items: center; font-size: 12px; }
@@ -42,13 +40,7 @@
   #lblL { left: 54px; } #lblR { right: 10px; }
 
   #dock { grid-area: dock; border-top: 1px solid var(--line); overflow-y: auto; min-width: 0; padding: 8px 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-  #dock label { display: block; font-size: 11px; color: var(--sub); margin-top: 6px; }
-  select { width: 100%; min-width: 0; border: 1px solid var(--line); background: #fff; padding: 4px; }
-  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
-  .row label { margin: 0; }
   .btn { padding: 0 10px; border: 1px solid var(--line); background: #fff; }
-  input[type=range] { flex: 1 1 140px; min-width: 120px; accent-color: #222; }
-  output { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--sub); }
   .legend-item { display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; margin: 0; padding: 4px 0; background: none; border: 0; border-bottom: 1px solid var(--line); }
   .legend-item small { display: block; color: var(--sub); font-size: 11px; }
   .swatch { flex: none; width: 14px; height: 14px; border: 3px solid; }
@@ -59,13 +51,12 @@
   .shapeLab .in { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); cursor: pointer; display: flex; flex-direction: column; align-items: center; width: max-content; max-width: 220px; background: rgba(255,255,255,.93); border: 1.5px solid var(--c, #555); padding: 2px 8px; line-height: 1.3; font-size: 12px; font-weight: 600; color: #222; }
   .shapeLab .nm { white-space: normal; overflow-wrap: anywhere; }
   .shapeLab .er { white-space: nowrap; font-weight: 400; font-size: 10px; color: #555; }
-  .noshapelabels .shapeLab .nm, .noshapelabels .shapeLab .er { display: none; }
   .leaflet-popup-content { max-width: min(260px,65vw); overflow-wrap: anywhere; }
   .shape-memo { white-space: pre-wrap; }
   #fatal { position: absolute; inset: 0; z-index: 900; padding: 24px; display: grid; place-content: center; background: #fff; text-align: center; }
   .leaflet-right { right: env(safe-area-inset-right); }
   .leaflet-left { left: env(safe-area-inset-left); }
-  @media(pointer:coarse) { button,select,input { min-height: 44px; } .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; } .leaflet-popup-close-button { min-width: 44px; min-height: 44px; } }
+  @media(pointer:coarse) { button { min-height: 44px; } .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; } .leaflet-popup-close-button { min-width: 44px; min-height: 44px; } }
   @media(min-width:900px) {
     body { grid-template-columns: 320px minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); grid-template-areas: "head map" "dock map"; }
     header { border-right: 1px solid var(--line); max-height: 36dvh; }
@@ -75,23 +66,16 @@
 <header><h1 id="title"></h1>
 <p id="rule"></p>
 <div class="modes" id="modes" aria-label="比較の表示方法">
-<button type="button" data-mode="timeline">全面</button>
-<button type="button" data-mode="swipe">スワイプ</button>
-<button type="button" data-mode="lens">レンズ</button>
-<button type="button" data-mode="blend">重ねる</button></div></header>
+<button type="button" data-mode="color">色のみ</button>
+<button type="button" data-mode="map">色＋地図</button>
+<button type="button" data-mode="swipe">スワイプ</button></div></header>
 <main id="mapwrap" aria-label="時代の地図"><div id="map"></div>
 <div id="status" role="status"></div><button type="button" id="home">全体</button>
-<div id="lensRing" hidden><span id="lensLabel"></span></div>
 <div id="swipe" hidden role="slider" tabindex="0" aria-label="比較の境界を左右に移動" aria-valuemin="3" aria-valuemax="97" aria-valuenow="50" aria-orientation="horizontal"><div class="grip">↔</div></div>
 <div id="lblL" class="sideLabel" hidden></div><div id="lblR" class="sideLabel" hidden></div>
 <div id="fatal" hidden>地図ライブラリを読み込めませんでした。インターネット接続を確認して、このページを開き直してください。</div></main>
-<aside id="dock" aria-label="レイヤーと凡例">
-<label for="eraSelect">比較するレイヤー</label><select id="eraSelect"></select>
-<div id="ctlBase"><label for="baseSelect">土台レイヤー</label><select id="baseSelect"></select></div>
-<div id="ctlLens" hidden><div class="row"><label for="lensR">半径</label><input type="range" id="lensR" min="40" max="260" step="5"><output id="lensRVal" for="lensR"></output></div><div class="row"><button type="button" class="btn" id="grabLens">レンズを動かす</button><button type="button" class="btn" id="grabMap">地図を動かす</button></div></div>
-<div id="ctlSwipe" class="row" hidden><button type="button" class="btn" id="swapSides">⇄ 左右を入れ替える</button></div>
-<div id="ctlBlend" hidden><div class="row"><label for="opacity">濃さ</label><input type="range" id="opacity" min="0" max="100"><output id="opacityVal" for="opacity"></output></div><button type="button" class="btn" id="multiply">乗算</button></div>
-<label>凡例</label><div id="legend"></div>
+<aside id="dock" aria-label="凡例と出典">
+<div>凡例</div><div id="legend"></div>
 <p class="foot" id="credit"></p><p class="foot">出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院（地理院タイル）</a>／<a href="https://ktgis.net/kjmapw/" target="_blank" rel="noopener">今昔マップ on the web</a></p>
 <button type="button" class="btn" id="reload">画像を再読み込み</button>
 </aside>
@@ -3560,72 +3544,18 @@
 <script>
 (function(){'use strict';
 var $=function(id){return document.getElementById(id);};
-var S=JSON.parse($('work-data').textContent);
-$('title').textContent=S.title; $('rule').textContent=S.rule; $('credit').textContent=S.credit; document.title=S.title;
+var work=JSON.parse($('work-data').textContent);
+$('title').textContent=work.title; $('rule').textContent=work.rule; $('credit').textContent=work.credit; document.title=work.title;
 if(typeof L==='undefined'){$('fatal').hidden=false;$('status').hidden=true;return;}
-  var CENTER = [35.388, 139.428];
-  var TILE = 'https://cyberjapandata.gsi.go.jp/xyz/{id}/{z}/{x}/{y}.{ext}';
-  var ATTR = '出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院（地理院タイル）</a>';
-  var KJ_TILE = 'https://ktgis.net/kjmapw/kjtilemap/tokyo50/{period}/{z}/{x}/{-y}.png';
-  var KJ_ATTR = '<a href="https://ktgis.net/kjmapw/" target="_blank" rel="noopener">今昔マップ on the web</a>';
-  var T = { est: '<span class="tag est">推定</span>', unk: '<span class="tag unk">未確認</span>', chk: '<span class="tag chk">確認</span>', good: '<span class="tag good">いいところ</span>' };
-
-  // time:true = 年代スライダーに並ぶもの。nodata:true = 2026-11-13 にキャンパス位置のタイルが 404 だったレイヤー。
-  var ERAS = [
-    // v2: ort_USA10（1945–50）と gazo3（1984–86）はキャンパス範囲が 404 のため、選択肢から外した。
-    { id: 'ort_old10', ext: 'png', time: true, maxNative: 17,
-      label: '1961–69', sub: 'モノクロ', full: '1961年〜1969年（モノクロ写真）',
-      sugata: T.est + '敷地は台地の上が畑のモザイク、斜面が林。東側に曲がった谷筋が入り込んでいるように見える（タイルを見た印象。判読は未確定）。校舎はまだ無い（開設は1990年）。',
-      good: '畑の一枚一枚が見える。人の手の跡が一番細かい時代。' },
-    { id: 'gazo1', ext: 'jpg', time: true, maxNative: 17,
-      label: '1974–78', sub: 'カラー', full: '1974年〜1978年（カラー写真）',
-      sugata: T.est + '丘は林と畑のまま。色がついて、林の濃い緑・畑の茶と緑・谷筋の明るい帯が見分けられる（タイルを見た印象）。',
-      good: '初めて色で読める。キャンパスになる前の丘の「ふつうの姿」。' },
-    { id: 'gazo2', ext: 'jpg', time: true, maxNative: 17,
-      label: '1979–83', sub: 'カラー', full: '1979年〜1983年（カラー写真）',
-      sugata: T.est + '1974–78 と大きくは変わらない農地と林（細部は未確認）。開設のおよそ10年前。',
-      good: '前の時代と見比べて「変わっていない所」を探せる。' },
-    { id: 'gazo4', ext: 'jpg', time: true, maxNative: 17,
-      label: '1987–90', sub: '開設前後', full: '1987年〜1990年（カラー写真・SFC開設前後）',
-      sugata: T.est + '校舎群はまだ写っておらず、土の色が出た面や新しい道筋が見える＝造成前〜造成の始まりに見える（タイルを見た印象）。' + T.unk + '撮影日。1990年開設のどれくらい前かは写真ごとに要確認。',
-      good: 'キャンパスになる直前の「最後の姿」。いまの建物の位置に何があったかを当てられる。' },
-    { id: 'seamlessphoto', ext: 'jpg', time: true, maxNative: 18,
-      label: '現在の写真', sub: '最新写真', full: '現在の写真（全国最新写真・シームレス）',
-      sugata: '校舎群・ループ道路・池・グラウンドがそろった今の姿。' + T.unk + '写真の撮影時点。後から増えた棟がどれかも未確認。',
-      good: '昔の跡（林の縁・谷の向き・高低差）が全部同時に見える唯一の時代。' },
-    { id: 'std', ext: 'png', maxNative: 18,
-      label: '標準地図', sub: '現在', full: '現在（標準地図）',
-      sugata: '建物の形・道・等高線・池が記号で読める今の地図。',
-      good: '記号で整理されているので、写真で見つけた跡の「名前」を確かめやすい。' },
-    { id: 'pale', ext: 'png', maxNative: 18,
-      label: '淡色地図', sub: '現在', full: '現在（淡色地図）',
-      sugata: '標準地図を薄くしたもの。窓・スワイプ・ブレンドの下敷き向き。',
-      good: '主張しないので、昔の画像を上に載せたときに昔が主役になる。' },
-    { id: 'hillshademap', ext: 'png', maxNative: 16,
-      label: '陰影起伏図', sub: '地形', full: '地形（陰影起伏図）',
-      sugata: 'いまの地面の凹凸。坂・谷筋・造成された平らな面が影で浮かぶ。' + T.unk + 'どの凹凸が元の地形の名残で、どれが造成かは、昔の写真と見比べないと分からない。',
-      good: '建物を消して「土地の形」だけを見られる。ブレンド＋乗算が合う。' },
-    { id: 'relief', ext: 'png', maxNative: 15,
-      label: '色別標高図', sub: '地形', full: '地形（色別標高図）',
-      sugata: '標高を色で塗った図。細かいズームのタイルが無いので拡大するとぼやける。',
-      good: '高い所・低い所がひと目で分かる。谷がどちらへ下るかを見るのに。' }
-  ];
+var mode='map', swipe=.5;
+var CENTER=[35.388,139.428], mapEl=$('map');
   var KJ_ERAS = [
     ['2man','1896-1909','#00695c'], ['00','1917-1924','#00838f'],
     ['01','1927-1939','#1565c0'], ['02','1944-1954','#283593'],
     ['03','1965-1968','#512da8'], ['04','1975-1978','#880e4f'],
     ['05','1983-1987','#c62828'], ['06','1992-1995','#558b2f'],
     ['07','1998-2005','#455a64']
-  ].map(function(row){
-    return {id:'kj_'+row[0], period:row[0], konjak:true, ext:'png', minZoom:8, maxNative:15,
-      label:'地形図 '+row[1], full:'地形図 '+row[1]+'（今昔マップ）', sub:'今昔マップ',
-      color:row[2], ink:'#fff',
-      sugata:'昔の地形図を記号や等高線で読めます。年代は収録期間です。',
-      good:'昔の道・集落・土地の形を、写真や現在の地図と見比べられます。'};
-  });
-  ERAS = ERAS.concat(KJ_ERAS);
-  var ERA = Object.create(null); ERAS.forEach(function (e) { ERA[e.id] = e; });
-  var TIME_ERAS = ERAS.filter(function (e) { return e.time; });
+  ].map(function(row){return {id:'kj_'+row[0],label:'地形図 '+row[1],full:'地形図 '+row[1]+'（今昔マップ）',color:row[2],ink:'#fff'};});
   var SHAPE_ERAS = [
     { id: 'ort_old10', label: '1961–69', long: '1961–69年（モノクロ写真）', color: '#43260f', ink: '#fff' },
     { id: 'gazo1', label: '1974–78', long: '1974–78年（カラー写真）', color: '#8a4a1b', ink: '#fff' },
@@ -3640,198 +3570,51 @@ if(typeof L==='undefined'){$('fatal').hidden=false;$('status').hidden=true;retur
   SHAPE_ERAS = SHAPE_ERAS.concat(KJ_ERAS.map(function(e){
     return {id:e.id,label:e.label,long:e.full,color:e.color,ink:e.ink};
   }));
-  var SE = Object.create(null); SHAPE_ERAS.forEach(function (e) { SE[e.id] = e; });
 
-  // 作品データは無加工で埋め込み、閲覧中の比較設定だけをメモリ上で切り替える。
-  var OFFSET_MPP17 = 40075016.68557849 * Math.cos(CENTER[0] * Math.PI / 180) / (256 * Math.pow(2,17));
-  S.photoOffsets=S.photoOffsets||{};
-  var mapEl = $('map');
-  // ズーム16でキャンパス全体が収まる。とても大きい画面だけ17。
-  function homeZoom() { return (mapEl.clientWidth >= 1500 && mapEl.clientHeight >= 1150) ? 17 : 16; }
-  var map = L.map(mapEl, {
-    center: CENTER, zoom: homeZoom(), minZoom: 15, maxZoom: 18, zoomAnimation: false, fadeAnimation: false,
-    maxBounds: [[35.3845, 139.4225], [35.3955, 139.4355]], maxBoundsViscosity: 1,
-    zoomControl: true, attributionControl: true
-  });
-  map.attributionControl.setPrefix(false);
-  map.attributionControl.addAttribution(ATTR);   // 常時表示（レイヤーを替えても消えない）
-  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
-
-  var eraPane = map.createPane('era');
-  eraPane.style.zIndex = 250;
-  eraPane.style.pointerEvents = 'none';
-  var basePane = map.getPane('tilePane');
-
-  function offsetPixels(id, zoom) {
-    var o = S.photoOffsets[id] || {dx:0,dy:0};
-    var mpp = OFFSET_MPP17 * Math.pow(2,17-zoom);
-    return {dx:o.dx/mpp,dy:o.dy/mpp};
-  }
-  // Each destination tile samples all intersecting source tiles. No container
-  // translation: pane clips, polygon vertices and viewport edges stay fixed.
-  var PhotoLayer = L.TileLayer.extend({
-    createTile: function(coords, done) {
-      var canvas = document.createElement('canvas'), size = this.getTileSize();
-      canvas.width = size.x; canvas.height = size.y;
-      var ctx = canvas.getContext('2d'), o = offsetPixels(this.options.photoEra,coords.z);
-      var left = coords.x*size.x-o.dx, top = coords.y*size.y-o.dy;
-      var x0=Math.floor(left/size.x), x1=Math.ceil((left+size.x)/size.x)-1;
-      var y0=Math.floor(top/size.y), y1=Math.ceil((top+size.y)/size.y)-1;
-      var pending=(x1-x0+1)*(y1-y0+1), failure=null, layer=this;
-      function finish(error) { if(error)failure=error; if(--pending===0)done(failure,canvas); }
-      for(var y=y0;y<=y1;y++)for(var x=x0;x<=x1;x++)(function(tx,ty){
-        var n=Math.pow(2,coords.z);
-        if(ty<0 || ty>=n){finish(new Error('写真の範囲外'));return;}
-        var source=L.point(((tx%n)+n)%n,ty);source.z=coords.z;
-        var img=new Image();
-        img.onload=function(){ctx.drawImage(img,tx*size.x-left,ty*size.y-top,size.x,size.y);finish(null);};
-        img.onerror=function(){finish(new Error('写真タイルを取得できません'));};
-        var era=ERA[layer.options.photoEra];
-        if(era.konjak){
-          // キャンバス取得：南西原点TMSなのでXYZのyを自分で反転する。
-          var y_tms=(Math.pow(2,source.z)-1)-source.y;
-          img.crossOrigin='anonymous';
-          img.src=KJ_TILE.replace('{period}',era.period).replace('{z}',source.z).replace('{x}',source.x).replace('{-y}',y_tms);
-        }else img.src=layer.getTileUrl(source);
-      })(x,y);
-      return canvas;
-    }
-  });
-  function makeLayer(e, pane) {
-    // LeafletはmaxNativeZoomで元タイルのズームを制限し、切り抜き内でも拡大する。
-    var Layer = e.konjak || (e.time && e.id!=='seamlessphoto') ? PhotoLayer : L.TileLayer;
-    // Leaflet表示経路：{-y} がXYZのyをTMSのyへ反転する。
-    var url=e.konjak ? KJ_TILE.replace('{period}',e.period) : TILE.replace('{id}',e.id).replace('{ext}',e.ext);
-    return new Layer(url, {
-      pane: pane, minZoom: e.minZoom || 5, crossOrigin: e.konjak ? 'anonymous' : false, maxZoom: 18, maxNativeZoom: e.maxNative, keepBuffer: 1, photoEra:e.id
-    });
-  }
-
-  map.attributionControl.addAttribution(KJ_ATTR);
-  var baseLayer=null,eraLayer=null,shapeViews=[];
-  var ring=$('lensRing'),handle=$('swipe'),lblL=$('lblL'),lblR=$('lblR');
-  var lensLL=L.latLng(CENTER);
-  function h(tag,attrs,kids){var el=document.createElement(tag);Object.keys(attrs||{}).forEach(function(k){if(k==='text')el.textContent=attrs[k];else if(k in el)el[k]=attrs[k];else el.setAttribute(k,attrs[k]);});(kids||[]).forEach(function(c){el.append(c);});return el;}
-  function status(){
-    var layers=[baseLayer,eraLayer].concat(shapeViews.map(function(v){return v.layer;})).filter(Boolean);
-    var failed=layers.some(function(l){return l.failed && l.failed.size;});
-    $('status').className=failed?'none':'';
-    $('status').textContent=navigator.onLine===false?'オフライン：接続後に画像を再読み込みします':failed?'画像の一部を取得できません。斜線部分は欠損です':layers.some(function(l){return l.isLoading();})?'画像を読み込み中…':'形 '+S.shapes.filter(function(s){return !s.hidden;}).length+'個を表示中';
-  }
-  function track(layer){layer.failed=new Set();function key(e){return e.coords.z+'/'+e.coords.x+'/'+e.coords.y;}layer.on('loading load',status);layer.on('tileerror',function(e){layer.failed.add(key(e));status();});layer.on('tileload tileunload',function(e){layer.failed.delete(key(e));status();});return layer;}
-  function setBase(id){if(!ERA[id])return;S.base=id;if(baseLayer)map.removeLayer(baseLayer);baseLayer=track(makeLayer(ERA[id],'tilePane')).addTo(map);$('baseSelect').value=id;updateLabels();status();}
-  function setEra(id){if(!ERA[id])return;S.era=id;if(eraLayer)map.removeLayer(eraLayer);eraLayer=track(makeLayer(ERA[id],'era')).addTo(map);$('eraSelect').value=id;updateLabels();applyClip();status();}
-  function setClip(v) { eraPane.style.clipPath = v; eraPane.style.webkitClipPath = v; }
-  function applyClip() {
-    var size = map.getSize();
-    if (S.mode === 'lens') {
-      var c = map.latLngToLayerPoint(lensLL), cc = map.latLngToContainerPoint(lensLL);
-      setClip('circle(' + S.lensR + 'px at ' + c.x + 'px ' + c.y + 'px)');
-      ring.style.left = cc.x + 'px'; ring.style.top = cc.y + 'px';
-      ring.style.width = ring.style.height = (S.lensR * 2) + 'px';
-    } else if (S.mode === 'swipe') {
-      var nw = map.containerPointToLayerPoint([0, 0]), se = map.containerPointToLayerPoint(size);
-      var sx = nw.x + size.x * S.swipe;
-      var x1 = S.swap ? sx : nw.x, x2 = S.swap ? se.x : sx;
-      setClip('polygon(' + x1 + 'px ' + nw.y + 'px,' + x2 + 'px ' + nw.y + 'px,' + x2 + 'px ' + se.y + 'px,' + x1 + 'px ' + se.y + 'px)');
-      handle.style.left = (size.x * S.swipe) + 'px';
-      handle.setAttribute('aria-valuenow', String(Math.round(S.swipe * 100)));
-    } else {
-      setClip('');
-    }
-  }
-  map.on('move zoom zoomend moveend resize viewreset', applyClip);
-
-  function updateLabels() {
-    var e = ERA[S.era], b = ERA[S.base];
-    $('lensLabel').textContent = e.label;
-    var oldTxt = '比較：' + e.label, nowTxt = '土台：' + b.label;
-    lblL.textContent = S.swap ? nowTxt : oldTxt;
-    lblR.textContent = S.swap ? oldTxt : nowTxt;
-  }
-
-
-  function setMode(m){
-    S.mode=m;
-    $('modes').querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.mode===m));});
-    eraPane.style.opacity=m==='blend'?String(S.opacity):'1';
-    eraPane.style.mixBlendMode=m==='blend'&&S.multiply?'multiply':'';
-    basePane.style.visibility=m==='timeline'?'hidden':'';
-    ring.hidden=m!=='lens';handle.hidden=m!=='swipe';lblL.hidden=lblR.hidden=m!=='swipe';
-    $('ctlLens').hidden=m!=='lens';$('ctlSwipe').hidden=m!=='swipe';$('ctlBlend').hidden=m!=='blend';$('ctlBase').hidden=m==='timeline';
-    applyGrab();applyClip();requestAnimationFrame(resizeAll);
-  }
-  function applyGrab(){var lock=S.mode==='lens'&&S.lensGrab;if(lock)map.dragging.disable();else map.dragging.enable();$('grabLens').setAttribute('aria-pressed',String(!!S.lensGrab));$('grabMap').setAttribute('aria-pressed',String(!S.lensGrab));}
-  function moveLens(ev){var r=mapEl.getBoundingClientRect(),y=ev.clientY-r.top;if(ev.pointerType&&ev.pointerType!=='mouse')y-=S.lensR*.5;lensLL=map.containerPointToLatLng([ev.clientX-r.left,y]);applyClip();}
-  function follows(ev){return S.mode==='lens'&&(ev.pointerType==='mouse'||S.lensGrab)&&!(ev.target.closest&&ev.target.closest('.leaflet-control,.leaflet-popup,.shapeLab'));}
-  mapEl.addEventListener('pointermove',function(ev){if(follows(ev)&&ev.isPrimary!==false)moveLens(ev);});
-  mapEl.addEventListener('pointerdown',function(ev){if(follows(ev)&&ev.isPrimary!==false)moveLens(ev);});
-  map.on('click',function(ev){if(S.mode==='lens'){lensLL=ev.latlng;applyClip();}});
-  (function(){var dragging=false;function upd(ev){var r=mapEl.getBoundingClientRect();S.swipe=Math.min(.97,Math.max(.03,(ev.clientX-r.left)/r.width));applyClip();}
-    handle.addEventListener('pointerdown',function(ev){dragging=true;handle.setPointerCapture(ev.pointerId);ev.preventDefault();upd(ev);});handle.addEventListener('pointermove',function(ev){if(dragging)upd(ev);});
-    ['pointerup','pointercancel','lostpointercapture'].forEach(function(type){handle.addEventListener(type,function(){dragging=false;});});
-    handle.addEventListener('keydown',function(ev){if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'){S.swipe=Math.min(.97,Math.max(.03,S.swipe+(ev.key==='ArrowLeft'?-.03:.03)));applyClip();ev.preventDefault();ev.stopPropagation();}});
-  })();
-  var LAYER_GROUPS=[{title:'昔の写真（4種）',layers:ERAS.slice(0,4)},{title:'いまの地図・写真（5種）',layers:ERAS.slice(4,9)},{title:'昔の地形図（9種）',layers:KJ_ERAS}];
-  ['eraSelect','baseSelect'].forEach(function(id){LAYER_GROUPS.forEach(function(group){var opt=h('optgroup',{label:group.title});group.layers.forEach(function(e){opt.append(h('option',{value:e.id,text:e.full}));});$(id).append(opt);});});
-  $('eraSelect').onchange=function(){setEra(this.value);};$('baseSelect').onchange=function(){setBase(this.value);};
-  $('modes').querySelectorAll('button').forEach(function(b){b.onclick=function(){setMode(b.dataset.mode);};});
-  $('lensR').value=S.lensR;$('lensRVal').textContent=S.lensR+'px';
-  $('lensR').oninput=function(){S.lensR=+this.value;$('lensRVal').textContent=S.lensR+'px';applyClip();};
-  $('grabLens').onclick=function(){S.lensGrab=true;applyGrab();};$('grabMap').onclick=function(){S.lensGrab=false;applyGrab();};
-  $('swapSides').onclick=function(){S.swap=!S.swap;updateLabels();applyClip();};
-  $('opacity').value=Math.round(S.opacity*100);$('opacityVal').textContent=$('opacity').value+'%';
-  $('opacity').oninput=function(){S.opacity=+this.value/100;$('opacityVal').textContent=this.value+'%';setMode(S.mode);};
-  $('multiply').setAttribute('aria-pressed',String(!!S.multiply));$('multiply').onclick=function(){S.multiply=!S.multiply;this.setAttribute('aria-pressed',String(S.multiply));setMode(S.mode);};
-  function updateShapeClips() {
-    shapeViews.forEach(function(v){
-      var coords=v.s.pts.map(function(p){return map.latLngToLayerPoint(p);});
-      var poly='polygon('+coords.map(function(q){return q.x+'px '+q.y+'px';}).join(',')+')';
-      var xs=coords.map(function(p){return p.x;}),ys=coords.map(function(p){return p.y;});
-      Object.assign(v.hatch.style,{left:Math.min.apply(null,xs)+'px',top:Math.min.apply(null,ys)+'px',width:(Math.max.apply(null,xs)-Math.min.apply(null,xs))+'px',height:(Math.max.apply(null,ys)-Math.min.apply(null,ys))+'px'});
-      v.pane.style.clipPath=poly; v.pane.style.webkitClipPath=poly;
-      v.pane.style.width=map.getSize().x+'px'; v.pane.style.height=map.getSize().y+'px';
-    });
-  }
-  map.on('move zoom moveend zoomend viewreset resize',updateShapeClips);
-  function labelIcon(s,i) {
-    var e=SE[s.era],box=h('div',{className:'in'});
-    box.style.borderColor=e.color;
-    if(S.shapeLabels==='number')box.append(h('b',{text:String(i+1)}));
-    else box.append(h('b',{className:'nm',text:s.name||'名前なし'}),h('div',{className:'er',text:e.label}));
-    return L.divIcon({className:'shapeLab',html:box,iconSize:null});
-  }
-
-  function popup(s){return h('div',{},[h('h3',{text:s.name||'名前なし'}),h('p',{text:SE[s.era].long}),h('p',{className:'shape-memo',text:s.memo||'メモはありません。'})]);}
-  function openShape(s,pos){L.popup().setLatLng(pos).setContent(popup(s)).openOn(map);}
-  function renderShapes(){
-    S.shapes.forEach(function(s,i){
-      if(s.hidden)return;
-      var pn='shape_'+s.id,group=map.createPane(pn+'_group');group.style.zIndex=String(260+i);group.style.pointerEvents='none';
-      var pane=map.createPane(pn,group),frame=map.createPane(pn+'_frame',group),labelPane=map.createPane(pn+'_label',group);pane.style.zIndex='0';frame.style.zIndex='1';labelPane.style.zIndex='2';pane.style.pointerEvents='none';
-      var hatch=h('div');Object.assign(hatch.style,{position:'absolute',zIndex:'0',background:'repeating-linear-gradient(45deg,#ddd 0 8px,#aaa 8px 16px)'});pane.append(hatch);
-      var v={s:s,pane:pane,hatch:hatch};v.layer=track(makeLayer(ERA[s.era],pn));
-      // 透明の塗りをヒット領域にして、輪郭だけでなく形の内部からもメモを開ける。
-      v.outline=L.polygon(s.pts,{pane:pn+'_frame',color:SE[s.era].color,weight:3,fill:true,fillOpacity:0,interactive:true,bubblingMouseEvents:false}).addTo(map);
-      v.outline.on('click',function(ev){openShape(s,ev.latlng);});
-      var pos=s.lab||v.outline.getBounds().getCenter();
-      if(S.shapeLabels!==false&&S.shapeLabels!=='none'){
-        v.label=L.marker(pos,{pane:pn+'_label',icon:labelIcon(s,i),draggable:false,keyboard:true,title:s.name,alt:s.name}).addTo(map);
-        v.label.on('click',function(){openShape(s,pos);});
-      }
-      shapeViews.push(v);updateShapeClips();v.layer.addTo(map);
-      var swatch=h('span',{className:'swatch','aria-hidden':'true'});swatch.style.borderColor=SE[s.era].color;
-      var item=h('button',{type:'button',className:'legend-item'},[swatch,h('span',{},[h('strong',{text:(i+1)+'. '+(s.name||'名前なし')}),h('small',{text:SE[s.era].long})])]);
-      item.onclick=function(){map.fitBounds(v.outline.getBounds(),{padding:[35,35],maxZoom:17,animate:false});openShape(s,pos);};$('legend').append(item);
-    });
-  }
-  function resizeAll(){map.invalidateSize({pan:false,animate:false});applyClip();updateShapeClips();}
-  function home(){resizeAll();var shapes=S.shapes.filter(function(s){return !s.hidden;});if(shapes.length)map.fitBounds(shapes.flatMap(function(s){return s.pts;}),{padding:[35,35],maxZoom:17,animate:false});else map.setView(CENTER,homeZoom());}
-  function reloadVisiblePhotos(){if(eraLayer)eraLayer.redraw();if(baseLayer)baseLayer.redraw();shapeViews.forEach(function(v){v.layer.redraw();});updateShapeClips();status();}
-  $('home').onclick=home;$('reload').onclick=reloadVisiblePhotos;
-  setBase(S.base);setEra(S.era);renderShapes();setMode(S.mode);home();
-  if(window.ResizeObserver)new ResizeObserver(resizeAll).observe(mapEl);else window.addEventListener('resize',resizeAll);
-  map.on('moveend',reloadVisiblePhotos);
-  window.addEventListener('online',reloadVisiblePhotos);window.addEventListener('offline',status);
+var SE=Object.create(null); SHAPE_ERAS.forEach(function(e){SE[e.id]=e;});
+function pastel(hex){return '#'+hex.slice(1).match(/../g).map(function(c){return Math.round(parseInt(c,16)*.3+255*.7).toString(16).padStart(2,'0');}).join('');}
+function h(tag,attrs,kids){var el=document.createElement(tag);Object.keys(attrs||{}).forEach(function(k){if(k==='text')el.textContent=attrs[k];else if(k in el)el[k]=attrs[k];else el.setAttribute(k,attrs[k]);});(kids||[]).forEach(function(c){el.append(c);});return el;}
+var map=L.map(mapEl,{center:CENTER,zoom:16,minZoom:15,maxZoom:18,zoomAnimation:false,fadeAnimation:false,maxBounds:[[35.3845,139.4225],[35.3955,139.4355]],maxBoundsViscosity:1});
+map.attributionControl.setPrefix(false);
+map.attributionControl.addAttribution('出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院（地理院タイル）</a>');
+L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
+var photoPane=map.createPane('photo');photoPane.style.zIndex='250';photoPane.style.pointerEvents='none';
+var shapePane=map.createPane('shapes');shapePane.style.zIndex='400';
+var labelPane=map.createPane('shapeLabels');labelPane.style.zIndex='450';
+var shapes=work.shapes.filter(function(s){return !s.hidden;}), views=[];
+var baseLayer,photoLayer;
+function status(){var layers=[baseLayer,photoLayer].filter(function(l){return l&&map.hasLayer(l);});var failed=layers.some(function(l){return l.failed.size;});$('status').className=failed?'none':'';$('status').textContent=!layers.length?'形 '+shapes.length+'個を表示中':navigator.onLine===false?'オフライン：接続後に画像を再読み込みします':failed?'画像の一部を取得できません。再読み込みしてください':layers.some(function(l){return l.isLoading();})?'画像を読み込み中…':'形 '+shapes.length+'個を表示中';}
+function track(layer){layer.failed=new Set();function key(e){return e.coords.z+'/'+e.coords.x+'/'+e.coords.y;}layer.on('loading load',status);layer.on('tileerror',function(e){layer.failed.add(key(e));status();});layer.on('tileload tileunload',function(e){layer.failed.delete(key(e));status();});return layer;}
+var tile='https://cyberjapandata.gsi.go.jp/xyz/';
+baseLayer=track(L.tileLayer(tile+'pale/{z}/{x}/{y}.png',{maxZoom:18,maxNativeZoom:18,keepBuffer:1}));
+photoLayer=track(L.tileLayer(tile+'seamlessphoto/{z}/{x}/{y}.jpg',{pane:'photo',maxZoom:18,maxNativeZoom:18,keepBuffer:1}));
+function popup(s){return h('div',{},[h('h3',{text:s.name||'名前なし'}),h('p',{text:SE[s.era].long}),h('p',{className:'shape-memo',text:s.memo||'メモはありません。'})]);}
+function openShape(s,pos){L.popup().setLatLng(pos).setContent(popup(s)).openOn(map);}
+shapes.forEach(function(s,i){var e=SE[s.era],color=pastel(e.color);
+var polygon=L.polygon(s.pts,{pane:'shapes',color:e.color,weight:1,fillColor:color,fillOpacity:.65,interactive:true,bubblingMouseEvents:false}).addTo(map);
+polygon.on('click',function(ev){openShape(s,ev.latlng);});
+var box=h('div',{className:'in'},[h('b',{className:'nm',text:s.name||'名前なし'}),h('div',{className:'er',text:e.label})]);box.style.borderColor=e.color;
+var pos=s.lab||polygon.getBounds().getCenter();var label=L.marker(pos,{pane:'shapeLabels',icon:L.divIcon({className:'shapeLab',html:box,iconSize:null}),keyboard:true,title:s.name,alt:s.name}).addTo(map);label.on('click',function(){openShape(s,pos);});
+views.push({polygon:polygon,label:label});
+var swatch=h('span',{className:'swatch','aria-hidden':'true'});swatch.style.borderColor=e.color;swatch.style.background=color;
+var item=h('button',{type:'button',className:'legend-item'},[swatch,h('span',{},[h('strong',{text:(i+1)+'. '+(s.name||'名前なし')}),h('small',{text:e.long})])]);item.onclick=function(){map.fitBounds(polygon.getBounds(),{padding:[35,35],maxZoom:17,animate:false});openShape(s,pos);};$('legend').append(item);
+});
+var handle=$('swipe');$('lblL').textContent='標準地図（淡色）';$('lblR').textContent='最新の空中写真';
+function applyClip(){if(mode!=='swipe'){photoPane.style.clipPath='';return;}var size=map.getSize(),nw=map.containerPointToLayerPoint([0,0]),se=map.containerPointToLayerPoint(size),x=nw.x+size.x*swipe;photoPane.style.clipPath='polygon('+x+'px '+nw.y+'px,'+se.x+'px '+nw.y+'px,'+se.x+'px '+se.y+'px,'+x+'px '+se.y+'px)';handle.style.left=size.x*swipe+'px';handle.setAttribute('aria-valuenow',String(Math.round(swipe*100)));}
+function setMode(next){if(!['color','map','swipe'].includes(next))return;mode=next;map.closePopup();$('modes').querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});
+if(mode==='color'){if(map.hasLayer(baseLayer))map.removeLayer(baseLayer);}else if(!map.hasLayer(baseLayer))baseLayer.addTo(map);
+if(mode==='swipe'){if(!map.hasLayer(photoLayer))photoLayer.addTo(map);}else if(map.hasLayer(photoLayer))map.removeLayer(photoLayer);
+views.forEach(function(v){v.polygon.setStyle({weight:mode==='swipe'?1:1.2,fill:mode!=='swipe',fillOpacity:mode==='color'?1:.65});if(mode==='swipe'){if(map.hasLayer(v.label))map.removeLayer(v.label);}else if(!map.hasLayer(v.label))v.label.addTo(map);});
+handle.hidden=$('lblL').hidden=$('lblR').hidden=mode!=='swipe';$('reload').hidden=mode==='color';applyClip();status();}
+$('modes').querySelectorAll('button').forEach(function(b){b.onclick=function(){setMode(b.dataset.mode);};});
+(function(){var dragging=false;function update(ev){var r=mapEl.getBoundingClientRect();swipe=Math.min(.97,Math.max(.03,(ev.clientX-r.left)/r.width));applyClip();}handle.addEventListener('pointerdown',function(ev){if(ev.isPrimary===false||ev.button!==0)return;dragging=true;handle.setPointerCapture(ev.pointerId);ev.preventDefault();update(ev);});handle.addEventListener('pointermove',function(ev){if(dragging)update(ev);});['pointerup','pointercancel','lostpointercapture'].forEach(function(type){handle.addEventListener(type,function(){dragging=false;});});handle.addEventListener('keydown',function(ev){if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'||ev.key==='Home'||ev.key==='End'){swipe=ev.key==='Home'?.03:ev.key==='End'?.97:Math.min(.97,Math.max(.03,swipe+(ev.key==='ArrowLeft'?-.03:.03)));applyClip();ev.preventDefault();ev.stopPropagation();}});})();
+function resizeAll(){map.invalidateSize({pan:false,animate:false});applyClip();}
+function home(){resizeAll();if(shapes.length)map.fitBounds(shapes.flatMap(function(s){return s.pts;}),{padding:[35,35],maxZoom:17,animate:false});else map.setView(CENTER,16);}
+function reload(){[baseLayer,photoLayer].forEach(function(l){if(map.hasLayer(l)){l.failed.clear();l.redraw();}});status();}
+$('home').onclick=home;$('reload').onclick=reload;
+map.on('move zoom zoomend moveend resize viewreset',applyClip);
+if(window.ResizeObserver)new ResizeObserver(resizeAll).observe(mapEl);else window.addEventListener('resize',resizeAll);
+window.addEventListener('online',reload);window.addEventListener('offline',status);
+setMode('map');home();
 })();
 </script></body></html>
