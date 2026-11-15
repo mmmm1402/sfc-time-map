@@ -22,7 +22,7 @@
   header { grid-area: head; padding: 8px 10px; padding-top: max(8px, env(safe-area-inset-top)); border-bottom: 1px solid var(--line); max-height: 29dvh; overflow: auto; }
   h1 { font-size: 14px; font-weight: 600; margin: 0; }
   #rule { margin: 2px 0 6px; font-size: 12px; color: var(--sub); }
-  .modes { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 4px; }
+  .modes { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 4px; }
   .modes button { border: 1px solid var(--line); background: #fff; padding: 4px 2px; }
   .modes button[aria-pressed="true"] { background: #222; border-color: #222; color: #fff; }
 
@@ -66,7 +66,6 @@
 <header><h1 id="title"></h1>
 <p id="rule"></p>
 <div class="modes" id="modes" aria-label="比較の表示方法">
-<button type="button" data-mode="color">色のみ</button>
 <button type="button" data-mode="map">色＋地図</button>
 <button type="button" data-mode="swipe">スワイプ</button></div></header>
 <main id="mapwrap" aria-label="時代の地図"><div id="map"></div>
@@ -3578,16 +3577,26 @@ var map=L.map(mapEl,{center:CENTER,zoom:16,minZoom:15,maxZoom:18,zoomAnimation:f
 map.attributionControl.setPrefix(false);
 map.attributionControl.addAttribution('出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院（地理院タイル）</a>');
 L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
-var photoPane=map.createPane('photo');photoPane.style.zIndex='250';photoPane.style.pointerEvents='none';
+var workPane=map.createPane('work');workPane.style.zIndex='260';workPane.style.pointerEvents='none';
 var shapePane=map.createPane('shapes');shapePane.style.zIndex='400';
 var labelPane=map.createPane('shapeLabels');labelPane.style.zIndex='450';
 var shapes=work.shapes.filter(function(s){return !s.hidden;}), views=[];
-var baseLayer,photoLayer;
-function status(){var layers=[baseLayer,photoLayer].filter(function(l){return l&&map.hasLayer(l);});var failed=layers.some(function(l){return l.failed.size;});$('status').className=failed?'none':'';$('status').textContent=!layers.length?'形 '+shapes.length+'個を表示中':navigator.onLine===false?'オフライン：接続後に画像を再読み込みします':failed?'画像の一部を取得できません。再読み込みしてください':layers.some(function(l){return l.isLoading();})?'画像を読み込み中…':'形 '+shapes.length+'個を表示中';}
+var baseLayer;
+function status(){var layers=[baseLayer].concat(views.map(function(v){return v.layer;})).filter(function(l){return l&&map.hasLayer(l);});var failed=layers.some(function(l){return l.failed.size;});$('status').className=failed?'none':'';$('status').textContent=!layers.length?'形 '+shapes.length+'個を表示中':navigator.onLine===false?'オフライン：接続後に画像を再読み込みします':failed?'画像の一部を取得できません。再読み込みしてください':layers.some(function(l){return l.isLoading();})?'画像を読み込み中…':'形 '+shapes.length+'個を表示中';}
 function track(layer){layer.failed=new Set();function key(e){return e.coords.z+'/'+e.coords.x+'/'+e.coords.y;}layer.on('loading load',status);layer.on('tileerror',function(e){layer.failed.add(key(e));status();});layer.on('tileload tileunload',function(e){layer.failed.delete(key(e));status();});return layer;}
 var tile='https://cyberjapandata.gsi.go.jp/xyz/';
 baseLayer=track(L.tileLayer(tile+'pale/{z}/{x}/{y}.png',{maxZoom:18,maxNativeZoom:18,keepBuffer:1}));
-photoLayer=track(L.tileLayer(tile+'seamlessphoto/{z}/{x}/{y}.jpg',{pane:'photo',maxZoom:18,maxNativeZoom:18,keepBuffer:1}));
+var KJ_TILE='https://ktgis.net/kjmapw/kjtilemap/tokyo50/{period}/{z}/{x}/{-y}.png';
+map.attributionControl.addAttribution('<a href="https://ktgis.net/kjmapw/" target="_blank" rel="noopener">今昔マップ on the web</a>');
+// 時代タイルの仕様（旧ビューアと同じ）。konjak=今昔マップ、native=元タイルの最大ズーム
+var ETILE={ort_old10:{ext:'png',native:17,canvas:true},gazo1:{ext:'jpg',native:17,canvas:true},gazo2:{ext:'jpg',native:17,canvas:true},gazo4:{ext:'jpg',native:17,canvas:true},seamlessphoto:{ext:'jpg',native:18},std:{ext:'png',native:18},pale:{ext:'png',native:18},hillshademap:{ext:'png',native:16},relief:{ext:'png',native:15}};
+KJ_ERAS.forEach(function(e){ETILE[e.id]={konjak:true,period:e.id.slice(3),native:15,min:8,canvas:true};});
+var OFFSETS=work.photoOffsets||{},MPP17=40075016.68557849*Math.cos(CENTER[0]*Math.PI/180)/(256*Math.pow(2,17));
+function offsetPx(id,z){var o=OFFSETS[id]||{dx:0,dy:0},mpp=MPP17*Math.pow(2,17-z);return {dx:o.dx/mpp,dy:o.dy/mpp};}
+// 出力タイルごとに、重なる元タイルを全部描く。コンテナは平行移動しないので、クリップ・頂点・表示端がずれない。
+var EraLayer=L.TileLayer.extend({createTile:function(coords,done){var canvas=document.createElement('canvas'),size=this.getTileSize();canvas.width=size.x;canvas.height=size.y;var ctx=canvas.getContext('2d'),id=this.options.eraId,t=ETILE[id],o=offsetPx(id,coords.z),left=coords.x*size.x-o.dx,top=coords.y*size.y-o.dy,x0=Math.floor(left/size.x),x1=Math.ceil((left+size.x)/size.x)-1,y0=Math.floor(top/size.y),y1=Math.ceil((top+size.y)/size.y)-1,pending=(x1-x0+1)*(y1-y0+1),failure=null,layer=this,n=Math.pow(2,coords.z);function fin(err){if(err)failure=err;if(--pending===0)done(failure,canvas);}
+for(var y=y0;y<=y1;y++)for(var x=x0;x<=x1;x++)(function(tx,ty){if(ty<0||ty>=n){fin(new Error('範囲外'));return;}var sx=((tx%n)+n)%n,img=new Image();img.onload=function(){ctx.drawImage(img,tx*size.x-left,ty*size.y-top,size.x,size.y);fin(null);};img.onerror=function(){fin(new Error('タイル取得失敗'));};img.crossOrigin='anonymous';img.src=t.konjak?KJ_TILE.replace('{period}',t.period).replace('{z}',coords.z).replace('{x}',sx).replace('{-y}',n-1-ty):tile+id+'/'+coords.z+'/'+sx+'/'+ty+'.'+t.ext;})(x,y);return canvas;}});
+function eraLayer(id,pane){var t=ETILE[id],url=t.konjak?KJ_TILE.replace('{period}',t.period):tile+id+'/{z}/{x}/{y}.'+t.ext,opt={pane:pane,minZoom:t.min||5,maxZoom:18,maxNativeZoom:t.native,keepBuffer:1,eraId:id};return track(t.canvas?new EraLayer(url,opt):L.tileLayer(url,opt));}
 function popup(s){return h('div',{},[h('h3',{text:s.name||'名前なし'}),h('p',{text:SE[s.era].long}),h('p',{className:'shape-memo',text:s.memo||'メモはありません。'})]);}
 function openShape(s,pos){L.popup().setLatLng(pos).setContent(popup(s)).openOn(map);}
 shapes.forEach(function(s,i){var e=SE[s.era],color=pastel(e.color);
@@ -3595,24 +3604,26 @@ var polygon=L.polygon(s.pts,{pane:'shapes',color:e.color,weight:1,fillColor:colo
 polygon.on('click',function(ev){openShape(s,ev.latlng);});
 var box=h('div',{className:'in'},[h('b',{className:'nm',text:s.name||'名前なし'}),h('div',{className:'er',text:e.label})]);box.style.borderColor=e.color;
 var pos=s.lab||polygon.getBounds().getCenter();var label=L.marker(pos,{pane:'shapeLabels',icon:L.divIcon({className:'shapeLab',html:box,iconSize:null}),keyboard:true,title:s.name,alt:s.name}).addTo(map);label.on('click',function(){openShape(s,pos);});
-views.push({polygon:polygon,label:label});
+var wp=map.createPane('work_'+i,workPane);wp.style.pointerEvents='none';
+var v={polygon:polygon,label:label,pts:s.pts,pane:wp,layer:eraLayer(s.era,'work_'+i)};views.push(v);
 var swatch=h('span',{className:'swatch','aria-hidden':'true'});swatch.style.borderColor=e.color;swatch.style.background=color;
 var item=h('button',{type:'button',className:'legend-item'},[swatch,h('span',{},[h('strong',{text:(i+1)+'. '+(s.name||'名前なし')}),h('small',{text:e.long})])]);item.onclick=function(){map.fitBounds(polygon.getBounds(),{padding:[35,35],maxZoom:17,animate:false});openShape(s,pos);};$('legend').append(item);
 });
-var handle=$('swipe');$('lblL').textContent='標準地図（淡色）';$('lblR').textContent='最新の空中写真';
-function applyClip(){if(mode!=='swipe'){photoPane.style.clipPath='';return;}var size=map.getSize(),nw=map.containerPointToLayerPoint([0,0]),se=map.containerPointToLayerPoint(size),x=nw.x+size.x*swipe;photoPane.style.clipPath='polygon('+x+'px '+nw.y+'px,'+se.x+'px '+nw.y+'px,'+se.x+'px '+se.y+'px,'+x+'px '+se.y+'px)';handle.style.left=size.x*swipe+'px';handle.setAttribute('aria-valuenow',String(Math.round(swipe*100)));}
-function setMode(next){if(!['color','map','swipe'].includes(next))return;mode=next;map.closePopup();$('modes').querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});
-if(mode==='color'){if(map.hasLayer(baseLayer))map.removeLayer(baseLayer);}else if(!map.hasLayer(baseLayer))baseLayer.addTo(map);
-if(mode==='swipe'){if(!map.hasLayer(photoLayer))photoLayer.addTo(map);}else if(map.hasLayer(photoLayer))map.removeLayer(photoLayer);
-views.forEach(function(v){v.polygon.setStyle({weight:mode==='swipe'?1:1.2,fill:mode!=='swipe',fillOpacity:mode==='color'?1:.65});if(mode==='swipe'){if(map.hasLayer(v.label))map.removeLayer(v.label);}else if(!map.hasLayer(v.label))v.label.addTo(map);});
-handle.hidden=$('lblL').hidden=$('lblR').hidden=mode!=='swipe';$('reload').hidden=mode==='color';applyClip();status();}
+var handle=$('swipe');$('lblL').textContent='現在の地図';$('lblR').textContent='作品（各時代の写真）';
+function shapeClips(){views.forEach(function(v){var q=v.pts.map(function(p){return map.latLngToLayerPoint(p);}),c='polygon('+q.map(function(a){return a.x+'px '+a.y+'px';}).join(',')+')';v.pane.style.clipPath=v.pane.style.webkitClipPath=c;});}
+function applyClip(){var c='';if(mode==='swipe'){var size=map.getSize(),nw=map.containerPointToLayerPoint([0,0]),se=map.containerPointToLayerPoint(size),x=nw.x+size.x*swipe;c='polygon('+x+'px '+nw.y+'px,'+se.x+'px '+nw.y+'px,'+se.x+'px '+se.y+'px,'+x+'px '+se.y+'px)';handle.style.left=size.x*swipe+'px';handle.setAttribute('aria-valuenow',String(Math.round(swipe*100)));}workPane.style.clipPath=workPane.style.webkitClipPath=labelPane.style.clipPath=labelPane.style.webkitClipPath=c;}
+function setMode(next){if(!['map','swipe'].includes(next))return;mode=next;map.closePopup();$('modes').querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});
+if(!map.hasLayer(baseLayer))baseLayer.addTo(map);
+views.forEach(function(v){if(mode==='swipe'){if(!map.hasLayer(v.layer))v.layer.addTo(map);}else if(map.hasLayer(v.layer))map.removeLayer(v.layer);
+v.polygon.setStyle({weight:mode==='swipe'?1:1.2,fill:true,fillOpacity:mode==='swipe'?0:.65});if(!map.hasLayer(v.label))v.label.addTo(map);});
+handle.hidden=$('lblL').hidden=$('lblR').hidden=mode!=='swipe';applyClip();shapeClips();status();}
 $('modes').querySelectorAll('button').forEach(function(b){b.onclick=function(){setMode(b.dataset.mode);};});
 (function(){var dragging=false;function update(ev){var r=mapEl.getBoundingClientRect();swipe=Math.min(.97,Math.max(.03,(ev.clientX-r.left)/r.width));applyClip();}handle.addEventListener('pointerdown',function(ev){if(ev.isPrimary===false||ev.button!==0)return;dragging=true;handle.setPointerCapture(ev.pointerId);ev.preventDefault();update(ev);});handle.addEventListener('pointermove',function(ev){if(dragging)update(ev);});['pointerup','pointercancel','lostpointercapture'].forEach(function(type){handle.addEventListener(type,function(){dragging=false;});});handle.addEventListener('keydown',function(ev){if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'||ev.key==='Home'||ev.key==='End'){swipe=ev.key==='Home'?.03:ev.key==='End'?.97:Math.min(.97,Math.max(.03,swipe+(ev.key==='ArrowLeft'?-.03:.03)));applyClip();ev.preventDefault();ev.stopPropagation();}});})();
-function resizeAll(){map.invalidateSize({pan:false,animate:false});applyClip();}
+function resizeAll(){map.invalidateSize({pan:false,animate:false});applyClip();shapeClips();}
 function home(){resizeAll();if(shapes.length)map.fitBounds(shapes.flatMap(function(s){return s.pts;}),{padding:[35,35],maxZoom:17,animate:false});else map.setView(CENTER,16);}
-function reload(){[baseLayer,photoLayer].forEach(function(l){if(map.hasLayer(l)){l.failed.clear();l.redraw();}});status();}
+function reload(){[baseLayer].concat(views.map(function(v){return v.layer;})).forEach(function(l){if(map.hasLayer(l)){l.failed.clear();l.redraw();}});shapeClips();status();}
 $('home').onclick=home;$('reload').onclick=reload;
-map.on('move zoom zoomend moveend resize viewreset',applyClip);
+map.on('move zoom zoomend moveend resize viewreset',function(){applyClip();shapeClips();});
 if(window.ResizeObserver)new ResizeObserver(resizeAll).observe(mapEl);else window.addEventListener('resize',resizeAll);
 window.addEventListener('online',reload);window.addEventListener('offline',status);
 setMode('map');home();
