@@ -1,0 +1,4313 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SFC 地形の名残の地図</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>  :root {
+    --ink: #1d2733; --sub: #5a6675; --line: #d5dbe3; --bg: #f6f4ef; --card: #ffffff;
+    --accent: #b4532a; --accent-ink: #ffffff; --soft: #f1e4da; --ok: #2f7d4f; --warn: #a15c00;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+    color: var(--ink); background: var(--bg); font-size: 15px; line-height: 1.5;
+    display: grid; grid-template-rows: auto minmax(42vh, 1fr) auto; grid-template-areas: "head" "map" "dock";
+    height: 100vh; height: 100dvh; overflow: hidden;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  /* ---------- header ---------- */
+  header { grid-area: head; padding: 8px 10px 6px; padding-top: max(8px, env(safe-area-inset-top)); background: var(--card); border-bottom: 1px solid var(--line); }
+  .title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .title h1 { font-size: 16px; margin: 0; letter-spacing: .02em; }
+  .title small { color: var(--sub); font-size: 11px; }
+  .modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .modes button {
+    min-height: 46px; border: 1px solid var(--line); background: #fff; border-radius: 10px;
+    font-weight: 600; font-size: 14px; padding: 4px 2px; line-height: 1.2;
+  }
+  .modes button span { display: block; font-size: 10px; font-weight: 400; color: var(--sub); }
+  .modes button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .modes button[aria-pressed="true"] span { color: #ffe9dc; }
+
+  .layer-picker { margin: 8px 0; min-width: 0; }
+  .layer-group { min-width: 0; margin: 8px 0; padding: 8px; border: 1px solid var(--line); border-radius: 10px; }
+  .layer-group legend { font-size: 12px; font-weight: 700; padding: 0 4px; }
+  .layer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .layer-grid .chip { min-width: 0; padding: 8px 4px; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
+  .layer-grid .chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--ink); }
+  .panel-heading { margin: 14px 0 6px; font-size: 13px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  button:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- map ---------- */
+  #mapwrap { grid-area: map; position: relative; min-height: 0; overflow: hidden; }
+  #map {
+    position: absolute; inset: 0; z-index: 0; touch-action: none;
+    /* 画像が無い所は斜線の地が見える */
+    background: repeating-linear-gradient(45deg, #e6e2d8 0 10px, #dcd7ca 10px 20px);
+  }
+  .leaflet-container { font: inherit; }
+  .leaflet-control-attribution { font-size: 11px; background: rgba(255,255,255,.88) !important; }
+  #status {
+    position: absolute; z-index: 600; top: 8px; left: 50%; transform: translateX(-50%);
+    max-width: calc(100% - 110px); background: rgba(29,39,51,.86); color: #fff; border-radius: 999px;
+    padding: 4px 12px; font-size: 12px; pointer-events: none; text-align: center;
+  }
+  #status b { font-weight: 700; }
+  #status.none { background: rgba(161,92,0,.94); }
+  #home {
+    position: absolute; z-index: 600; right: 10px; top: 8px; min-height: 40px; padding: 0 10px;
+    border: 1px solid var(--line); background: #fff; border-radius: 10px; font-size: 12px; font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  }
+  #lensRing {
+    position: absolute; z-index: 500; pointer-events: none; border-radius: 50%;
+    border: 3px solid var(--accent); box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 4px 18px rgba(0,0,0,.35);
+    transform: translate(-50%, -50%);
+  }
+  #lensRing span {
+    position: absolute; left: 50%; top: 100%; transform: translate(-50%, 6px); white-space: nowrap;
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  }
+  #swipe {
+    position: absolute; z-index: 500; top: 0; bottom: 0; width: 48px; margin-left: -24px;
+    cursor: ew-resize; touch-action: none;
+  }
+  #swipe::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; width: 4px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+  #swipe .grip {
+    position: absolute; left: 0; top: 50%; width: 48px; height: 48px; margin-top: -24px; border-radius: 50%;
+    background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 18px; font-weight: 700;
+    border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  }
+  .sideLabel {
+    position: absolute; z-index: 499; top: 44px; pointer-events: none; font-size: 12px; font-weight: 700;
+    background: rgba(255,255,255,.9); border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px;
+  }
+  #lblL { left: 54px; } #lblR { right: 10px; }
+
+  /* ---------- dock ---------- */
+  #dock {
+    grid-area: dock; background: var(--card); border-top: 1px solid var(--line); overflow-y: auto; max-height: 44vh; max-height: 44dvh;
+    padding: 8px 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch;
+  }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+  .lbl { font-size: 11px; color: var(--sub); font-weight: 700; flex: none; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 6px; -webkit-overflow-scrolling: touch; }
+  .chip {
+    flex: none; min-height: 44px; padding: 4px 12px; border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    font-weight: 700; font-size: 14px; line-height: 1.15; text-align: center;
+  }
+  .chip small { display: block; font-weight: 400; font-size: 10px; color: var(--sub); }
+  .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .chip[aria-pressed="true"] small { color: #cdd6e0; }
+  .chip.nodata { border-style: dashed; color: #8a93a0; }
+  .btn {
+    min-height: 44px; padding: 0 14px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font-weight: 600; font-size: 14px;
+  }
+  .btn.on, .btn[aria-pressed="true"] { background: var(--soft); border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.small { min-height: 38px; font-size: 13px; padding: 0 10px; }
+  input[type=range] { flex: 1 1 140px; min-width: 120px; height: 36px; accent-color: var(--accent); }
+  .val { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--sub); min-width: 3.5em; text-align: right; }
+  #caption { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: #fbfaf7; margin: 4px 0 6px; }
+  #caption h2 { font-size: 15px; margin: 0 0 2px; }
+  #caption p { margin: 2px 0; font-size: 13px; }
+  .tag { display: inline-block; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-right: 4px; vertical-align: 1px; border: 1px solid; }
+  .tag.est { color: var(--warn); border-color: var(--warn); background: #fff6e6; }
+  .tag.unk { color: #6b4fa0; border-color: #6b4fa0; background: #f3eefb; }
+  .tag.chk { color: var(--ok); border-color: var(--ok); background: #ebf6ef; }
+  .tag.good { color: var(--accent); border-color: var(--accent); background: var(--soft); }
+  .foot { font-size: 11px; color: var(--sub); margin: 8px 0 0; }
+  .foot a { color: inherit; }
+  details.help summary { font-size: 12px; color: var(--sub); cursor: pointer; padding: 6px 0; }
+  details.help ul { margin: 0 0 6px; padding-left: 1.2em; font-size: 12px; color: var(--sub); }
+
+  .shapeLab { background: none; border: 0; }
+  .shapeLab .in {
+    position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); white-space: nowrap; cursor: grab;
+    display: flex; flex-direction: column; align-items: center; gap: 1px; width: max-content; background: rgba(255,255,255,.93); border: 1.5px solid var(--c, #555);
+    border-radius: 999px; padding: 4px 10px; line-height: 1.3; font-size: 12px; font-weight: 700; color: #1d2733;
+    box-shadow: 0 1px 4px rgba(0,0,0,.35); -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .shapeLab .nm { white-space: nowrap; }
+  .shapeLab .er { white-space: nowrap; font-weight: 400; font-size: 10px; color: #444; }
+  .noshapelabels .shapeLab .nm, .noshapelabels .shapeLab .er { display: none; }
+  .noshapelabels .shapeLab .in { padding: 1px 2px; }
+
+  body { grid-template-rows: auto minmax(0,1fr) minmax(0,38dvh); }
+  header { max-height: 29dvh; overflow:auto; }
+  #dock { max-height:none; min-width:0; }
+  h1, p, .legend-item { overflow-wrap:anywhere; }
+  #rule { margin:4px 0; font-size:13px; }
+  #instructions { margin:4px 0; font-size:12px; color:var(--sub); }
+  .modes { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .modes button { overflow-wrap:anywhere; }
+  select { width:100%; min-width:0; min-height:44px; border:1px solid var(--line); border-radius:8px; background:white; padding:6px; }
+  .legend-item { display:flex; align-items:center; gap:8px; text-align:left; width:100%; margin:6px 0; padding:8px; background:white; border:1px solid var(--line); border-radius:8px; min-height:44px; }
+  .swatch { flex:none; width:18px; height:18px; border:3px solid; border-radius:3px; }
+  .legend-item small { display:block; color:var(--sub); }
+  .shapeLab .in { cursor:pointer; max-width:220px; }
+  .shapeLab .nm { white-space:normal; overflow-wrap:anywhere; }
+  .leaflet-popup-content { max-width: min(260px,65vw); overflow-wrap:anywhere; }
+  .shape-memo { white-space:pre-wrap; }
+  #fatal { position:absolute; inset:0; z-index:900; padding:24px; display:grid; place-content:center; background:var(--bg); text-align:center; }
+  #home { right:max(10px,env(safe-area-inset-right)); }
+  .leaflet-right { right:env(safe-area-inset-right); }
+  .leaflet-left { left:env(safe-area-inset-left); }
+  button,select,input { min-height:24px; }
+  @media(pointer:coarse) { button,select,input { min-height:44px; } .leaflet-control-zoom a { width:44px; height:44px; line-height:44px; } .leaflet-popup-close-button { min-width:44px; min-height:44px; } }
+  @media(min-width:900px) {
+    body { grid-template-columns:360px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); grid-template-areas:"head map" "dock map"; }
+    header { max-height:36dvh; border-right:1px solid var(--line); }
+    #dock { border-right:1px solid var(--line); }
+  }
+</style></head><body>
+<header><div class="title"><h1 id="title"></h1><small>閲覧用</small></div>
+<p id="rule"></p><p id="instructions">ドラッグで移動／スワイプやレンズで今と昔を比べられます。形や凡例を押すとメモが読めます。</p>
+<div class="modes" id="modes" aria-label="比較の表示方法">
+<button type="button" data-mode="timeline">全面<span>レイヤーを見る</span></button>
+<button type="button" data-mode="swipe">スワイプ<span>左右で比較</span></button>
+<button type="button" data-mode="lens">レンズ<span>窓で比較</span></button>
+<button type="button" data-mode="blend">重ねる<span>透かして比較</span></button></div></header>
+<main id="mapwrap" aria-label="時代の地図"><div id="map"></div>
+<div id="status" role="status"></div><button type="button" id="home">全体に戻る</button>
+<div id="lensRing" hidden><span id="lensLabel"></span></div>
+<div id="swipe" hidden role="slider" tabindex="0" aria-label="比較の境界を左右に移動" aria-valuemin="3" aria-valuemax="97" aria-valuenow="50" aria-orientation="horizontal"><div class="grip">↔</div></div>
+<div id="lblL" class="sideLabel" hidden></div><div id="lblR" class="sideLabel" hidden></div>
+<div id="fatal" hidden>地図ライブラリを読み込めませんでした。インターネット接続を確認して、このページを開き直してください。</div></main>
+<aside id="dock" aria-label="レイヤーと凡例">
+<label class="field" for="eraSelect">比較するレイヤー</label><select id="eraSelect"></select>
+<div id="ctlBase"><label for="baseSelect">土台レイヤー（比較の相手）</label><select id="baseSelect"></select></div>
+<div id="ctlLens" hidden><div class="row"><label for="lensR">レンズの半径</label><input type="range" id="lensR" min="40" max="260" step="5"><output id="lensRVal" for="lensR"></output></div><div class="row"><span>指で動かすのは</span><button type="button" class="btn" id="grabLens">レンズ</button><button type="button" class="btn" id="grabMap">地図</button></div><p class="hint">マウスではレンズが追従。地図をタップしてもレンズを移せます。</p></div>
+<div id="ctlSwipe" class="row" hidden><button type="button" class="btn" id="swapSides">⇄ 左右を入れ替える</button><span class="hint">丸い境界を左右に動かす</span></div>
+<div id="ctlBlend" hidden><div class="row"><label for="opacity">重ねる濃さ</label><input type="range" id="opacity" min="0" max="100"><output id="opacityVal" for="opacity"></output></div><button type="button" class="btn" id="multiply">乗算で重ねる</button></div>
+<h2 class="panel-heading">凡例</h2><div id="legend"></div>
+<p class="foot" id="credit"></p><p class="foot">出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院（地理院タイル）</a>／<a href="https://ktgis.net/kjmapw/" target="_blank" rel="noopener">今昔マップ on the web</a><br>年代は各レイヤーの収録期間です。画像の表示には通信が必要です。</p>
+<button type="button" class="btn" id="reload">画像を再読み込み</button>
+</aside>
+<script id="work-data" type="application/json">{
+  "era": "seamlessphoto",
+  "mode": "swipe",
+  "base": "ort_old10",
+  "lensR": 110,
+  "opacity": 0,
+  "swipe": 0.7309565101387406,
+  "swap": true,
+  "multiply": false,
+  "labels": false,
+  "showPins": false,
+  "lensGrab": false,
+  "pins": [],
+  "tab": "make",
+  "title": "SFC 地形の名残の地図",
+  "rule": "各部分は、その地形が現在の形で確認できる最も古い時代の写真で描く",
+  "credit": "",
+  "shapes": [
+    {
+      "id": "smwh8cjctv1z7",
+      "name": "地形 1",
+      "era": "ort_old10",
+      "memo": "1961にあったこの時代にあった田んぼの区切り方/や、小道が今のみちと重なっている",
+      "pts": [
+        [
+          35.387152,
+          139.426163
+        ],
+        [
+          35.387003,
+          139.426246
+        ],
+        [
+          35.386886,
+          139.426259
+        ],
+        [
+          35.386809,
+          139.427313
+        ],
+        [
+          35.386891,
+          139.427813
+        ],
+        [
+          35.38695,
+          139.428028
+        ],
+        [
+          35.386951,
+          139.428029
+        ],
+        [
+          35.387302,
+          139.428382
+        ],
+        [
+          35.38766799999999,
+          139.42852
+        ],
+        [
+          35.387948,
+          139.428842
+        ],
+        [
+          35.38828,
+          139.429164
+        ],
+        [
+          35.388359,
+          139.429367
+        ],
+        [
+          35.388613,
+          139.429529
+        ],
+        [
+          35.388532,
+          139.429902
+        ],
+        [
+          35.388628000000004,
+          139.43026
+        ],
+        [
+          35.38886599999999,
+          139.430486
+        ],
+        [
+          35.38887499999999,
+          139.430495
+        ],
+        [
+          35.38888299999999,
+          139.430503
+        ],
+        [
+          35.388884,
+          139.430504
+        ],
+        [
+          35.389347,
+          139.431009
+        ],
+        [
+          35.389592,
+          139.431567
+        ],
+        [
+          35.389995,
+          139.430838
+        ],
+        [
+          35.38975,
+          139.430687
+        ],
+        [
+          35.389207,
+          139.430151
+        ],
+        [
+          35.389032,
+          139.430036
+        ],
+        [
+          35.389032,
+          139.430081
+        ],
+        [
+          35.388945,
+          139.430081
+        ],
+        [
+          35.388952,
+          139.429984
+        ],
+        [
+          35.388951,
+          139.429983
+        ],
+        [
+          35.38895,
+          139.429982
+        ],
+        [
+          35.388923000000005,
+          139.430001
+        ],
+        [
+          35.388919,
+          139.429922
+        ],
+        [
+          35.388914,
+          139.429911
+        ],
+        [
+          35.388896,
+          139.429871
+        ],
+        [
+          35.388890999999994,
+          139.429859
+        ],
+        [
+          35.38885799999999,
+          139.429786
+        ],
+        [
+          35.388834,
+          139.429734
+        ],
+        [
+          35.388825000000004,
+          139.429714
+        ],
+        [
+          35.38882,
+          139.429702
+        ],
+        [
+          35.388801,
+          139.429661
+        ],
+        [
+          35.388796,
+          139.42965
+        ],
+        [
+          35.388772,
+          139.429597
+        ],
+        [
+          35.38877,
+          139.429593
+        ],
+        [
+          35.388746,
+          139.429519
+        ],
+        [
+          35.38872,
+          139.429441
+        ],
+        [
+          35.388701,
+          139.429385
+        ],
+        [
+          35.388683,
+          139.42933
+        ],
+        [
+          35.388649,
+          139.429229
+        ],
+        [
+          35.388649,
+          139.429228
+        ],
+        [
+          35.388577999999995,
+          139.429014
+        ],
+        [
+          35.388478,
+          139.428855
+        ],
+        [
+          35.388451,
+          139.428812
+        ],
+        [
+          35.38845084435798,
+          139.4288107548638
+        ],
+        [
+          35.388411,
+          139.428748
+        ],
+        [
+          35.388409,
+          139.428745
+        ],
+        [
+          35.388405999999996,
+          139.42874
+        ],
+        [
+          35.388403,
+          139.428735
+        ],
+        [
+          35.388245,
+          139.428542
+        ],
+        [
+          35.38775799999999,
+          139.428148
+        ],
+        [
+          35.387336,
+          139.427941
+        ],
+        [
+          35.387236,
+          139.427488
+        ],
+        [
+          35.387236,
+          139.427487
+        ],
+        [
+          35.387236,
+          139.427485
+        ],
+        [
+          35.387056,
+          139.426868
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwh8gbyu74kn",
+      "name": "地形 2",
+      "era": "ort_old10",
+      "memo": "",
+      "pts": [
+        [
+          35.384608,
+          139.427218
+        ],
+        [
+          35.384554,
+          139.427233
+        ],
+        [
+          35.384554,
+          139.427791
+        ],
+        [
+          35.384834,
+          139.428713
+        ],
+        [
+          35.384852,
+          139.429271
+        ],
+        [
+          35.385096,
+          139.429786
+        ],
+        [
+          35.38537600000001,
+          139.430237
+        ],
+        [
+          35.385744,
+          139.430795
+        ],
+        [
+          35.386286,
+          139.430838
+        ],
+        [
+          35.38696800000001,
+          139.430473
+        ],
+        [
+          35.386811,
+          139.430065
+        ],
+        [
+          35.386321,
+          139.429979
+        ],
+        [
+          35.386076,
+          139.430044
+        ],
+        [
+          35.385954,
+          139.429593
+        ],
+        [
+          35.385726,
+          139.429142
+        ],
+        [
+          35.385691,
+          139.428692
+        ],
+        [
+          35.385901,
+          139.428692
+        ],
+        [
+          35.386251,
+          139.428799
+        ],
+        [
+          35.386671,
+          139.428778
+        ],
+        [
+          35.38724800000001,
+          139.428778
+        ],
+        [
+          35.387475,
+          139.428908
+        ],
+        [
+          35.387494,
+          139.428919
+        ],
+        [
+          35.38751,
+          139.428927
+        ],
+        [
+          35.387510999999996,
+          139.428928
+        ],
+        [
+          35.38814,
+          139.4294
+        ],
+        [
+          35.38842,
+          139.429808
+        ],
+        [
+          35.388426,
+          139.429891
+        ],
+        [
+          35.388427,
+          139.429892
+        ],
+        [
+          35.388442,
+          139.430089
+        ],
+        [
+          35.388483,
+          139.430127
+        ],
+        [
+          35.388532,
+          139.429902
+        ],
+        [
+          35.388613,
+          139.429529
+        ],
+        [
+          35.388359,
+          139.429367
+        ],
+        [
+          35.38814,
+          139.429228
+        ],
+        [
+          35.387493,
+          139.428627
+        ],
+        [
+          35.387353,
+          139.428434
+        ],
+        [
+          35.387302,
+          139.428382
+        ],
+        [
+          35.386951,
+          139.428029
+        ],
+        [
+          35.38695,
+          139.428028
+        ],
+        [
+          35.386907,
+          139.42801
+        ],
+        [
+          35.386723,
+          139.428027
+        ],
+        [
+          35.386286,
+          139.428113
+        ],
+        [
+          35.385901,
+          139.42807
+        ],
+        [
+          35.385639000000005,
+          139.427984
+        ],
+        [
+          35.38545718040867,
+          139.4278651179595
+        ],
+        [
+          35.385456,
+          139.427865
+        ],
+        [
+          35.385455,
+          139.427864
+        ],
+        [
+          35.385411,
+          139.427834
+        ],
+        [
+          35.3854,
+          139.427584
+        ],
+        [
+          35.3854,
+          139.427583
+        ],
+        [
+          35.3854,
+          139.42758
+        ],
+        [
+          35.385256,
+          139.42722
+        ],
+        [
+          35.385255,
+          139.427219
+        ],
+        [
+          35.385255,
+          139.427218
+        ],
+        [
+          35.384609,
+          139.427218
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwh94jgr5ntj",
+      "name": "地形 3",
+      "era": "gazo1",
+      "memo": "",
+      "pts": [
+        [
+          35.385954,
+          139.423649
+        ],
+        [
+          35.385515999999996,
+          139.423885
+        ],
+        [
+          35.385096,
+          139.423885
+        ],
+        [
+          35.384747,
+          139.423907
+        ],
+        [
+          35.384572000000006,
+          139.424615
+        ],
+        [
+          35.384572000000006,
+          139.424872
+        ],
+        [
+          35.38510599999999,
+          139.424944
+        ],
+        [
+          35.385108,
+          139.424942
+        ],
+        [
+          35.385128,
+          139.424911
+        ],
+        [
+          35.385289,
+          139.424744
+        ],
+        [
+          35.385691,
+          139.4244
+        ],
+        [
+          35.386129,
+          139.424293
+        ],
+        [
+          35.38636900000001,
+          139.424462
+        ],
+        [
+          35.386859,
+          139.42466
+        ],
+        [
+          35.38686200000001,
+          139.424661
+        ],
+        [
+          35.38686299999999,
+          139.424661
+        ],
+        [
+          35.38698,
+          139.424713
+        ],
+        [
+          35.386981,
+          139.424713
+        ],
+        [
+          35.386758,
+          139.424272
+        ],
+        [
+          35.386426,
+          139.423885
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhawr6ino60",
+      "name": "地形 4",
+      "era": "gazo4",
+      "memo": "",
+      "pts": [
+        [
+          35.388018,
+          139.425817
+        ],
+        [
+          35.387196,
+          139.425838
+        ],
+        [
+          35.387152,
+          139.426163
+        ],
+        [
+          35.387056,
+          139.426868
+        ],
+        [
+          35.387236,
+          139.427485
+        ],
+        [
+          35.387236,
+          139.427487
+        ],
+        [
+          35.387236,
+          139.427488
+        ],
+        [
+          35.38737100000001,
+          139.427919
+        ],
+        [
+          35.38775799999999,
+          139.428148
+        ],
+        [
+          35.38786,
+          139.428198
+        ],
+        [
+          35.38863,
+          139.428284
+        ],
+        [
+          35.388927,
+          139.427066
+        ],
+        [
+          35.38892794092827,
+          139.42706129535867
+        ],
+        [
+          35.388914,
+          139.426895
+        ],
+        [
+          35.388942,
+          139.426896
+        ],
+        [
+          35.388951,
+          139.426789
+        ],
+        [
+          35.388952,
+          139.426786
+        ],
+        [
+          35.388961,
+          139.42668
+        ],
+        [
+          35.38897,
+          139.426573
+        ],
+        [
+          35.38897,
+          139.426572
+        ],
+        [
+          35.388996999999996,
+          139.426262
+        ],
+        [
+          35.388963999999994,
+          139.42625
+        ],
+        [
+          35.388932000000004,
+          139.426238
+        ],
+        [
+          35.38893100000001,
+          139.426238
+        ],
+        [
+          35.388929,
+          139.426236
+        ],
+        [
+          35.388926,
+          139.426233
+        ],
+        [
+          35.388925,
+          139.426232
+        ],
+        [
+          35.388924,
+          139.426231
+        ],
+        [
+          35.38884199999999,
+          139.426196
+        ],
+        [
+          35.388841000000006,
+          139.426196
+        ],
+        [
+          35.38884000000001,
+          139.426195
+        ],
+        [
+          35.38875199999999,
+          139.426152
+        ],
+        [
+          35.388313,
+          139.425943
+        ],
+        [
+          35.388182,
+          139.425886
+        ],
+        [
+          35.38805200000001,
+          139.42583
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhb32hpt05y",
+      "name": "地形 5",
+      "era": "gazo4",
+      "memo": "",
+      "pts": [
+        [
+          35.38765899999999,
+          139.424862
+        ],
+        [
+          35.38765899999999,
+          139.424915
+        ],
+        [
+          35.387616,
+          139.424915
+        ],
+        [
+          35.387616,
+          139.424969
+        ],
+        [
+          35.387572,
+          139.424969
+        ],
+        [
+          35.387572,
+          139.425076
+        ],
+        [
+          35.387528,
+          139.425076
+        ],
+        [
+          35.387528,
+          139.425184
+        ],
+        [
+          35.387441,
+          139.425184
+        ],
+        [
+          35.387441,
+          139.42513
+        ],
+        [
+          35.387221,
+          139.425126
+        ],
+        [
+          35.387222,
+          139.425184
+        ],
+        [
+          35.387003,
+          139.425183
+        ],
+        [
+          35.387003,
+          139.425237
+        ],
+        [
+          35.38677100000001,
+          139.425243
+        ],
+        [
+          35.386741,
+          139.425251
+        ],
+        [
+          35.386741,
+          139.425253
+        ],
+        [
+          35.38674,
+          139.425253
+        ],
+        [
+          35.38674,
+          139.425256
+        ],
+        [
+          35.386741,
+          139.425344
+        ],
+        [
+          35.38669899999999,
+          139.425344
+        ],
+        [
+          35.386696,
+          139.425446
+        ],
+        [
+          35.386696,
+          139.425452
+        ],
+        [
+          35.386696,
+          139.425455
+        ],
+        [
+          35.386739000000006,
+          139.425461
+        ],
+        [
+          35.38674,
+          139.425469
+        ],
+        [
+          35.386741,
+          139.425469
+        ],
+        [
+          35.386742,
+          139.425476
+        ],
+        [
+          35.386787,
+          139.425496
+        ],
+        [
+          35.386998,
+          139.425559
+        ],
+        [
+          35.38726599999999,
+          139.425559
+        ],
+        [
+          35.38726599999999,
+          139.425613
+        ],
+        [
+          35.387397,
+          139.425613
+        ],
+        [
+          35.387397,
+          139.425666
+        ],
+        [
+          35.387484,
+          139.425666
+        ],
+        [
+          35.387484,
+          139.42572
+        ],
+        [
+          35.387922,
+          139.42572
+        ],
+        [
+          35.387922,
+          139.425774
+        ],
+        [
+          35.388053000000006,
+          139.425774
+        ],
+        [
+          35.38805200000001,
+          139.42583
+        ],
+        [
+          35.388183999999995,
+          139.425827
+        ],
+        [
+          35.388182,
+          139.425886
+        ],
+        [
+          35.388315,
+          139.425881
+        ],
+        [
+          35.388313,
+          139.425943
+        ],
+        [
+          35.38849,
+          139.425935
+        ],
+        [
+          35.38849,
+          139.425988
+        ],
+        [
+          35.388621,
+          139.425988
+        ],
+        [
+          35.388621,
+          139.426042
+        ],
+        [
+          35.388709,
+          139.426042
+        ],
+        [
+          35.388709,
+          139.426095
+        ],
+        [
+          35.388753,
+          139.426095
+        ],
+        [
+          35.38875199999999,
+          139.426152
+        ],
+        [
+          35.38884000000001,
+          139.426149
+        ],
+        [
+          35.38884000000001,
+          139.426195
+        ],
+        [
+          35.388841000000006,
+          139.426196
+        ],
+        [
+          35.38884199999999,
+          139.426196
+        ],
+        [
+          35.388928,
+          139.426203
+        ],
+        [
+          35.388925,
+          139.426232
+        ],
+        [
+          35.388926,
+          139.426233
+        ],
+        [
+          35.388929,
+          139.426236
+        ],
+        [
+          35.38893100000001,
+          139.426238
+        ],
+        [
+          35.388932000000004,
+          139.426238
+        ],
+        [
+          35.388963999999994,
+          139.42625
+        ],
+        [
+          35.388996999999996,
+          139.426262
+        ],
+        [
+          35.38904600000001,
+          139.426269
+        ],
+        [
+          35.38906200000001,
+          139.426261
+        ],
+        [
+          35.389067,
+          139.426259
+        ],
+        [
+          35.389067,
+          139.426171
+        ],
+        [
+          35.389089,
+          139.426171
+        ],
+        [
+          35.389089,
+          139.42609
+        ],
+        [
+          35.389111,
+          139.42609
+        ],
+        [
+          35.389111,
+          139.42601
+        ],
+        [
+          35.389133,
+          139.42601
+        ],
+        [
+          35.389139,
+          139.425988
+        ],
+        [
+          35.389145000000006,
+          139.42596
+        ],
+        [
+          35.38914599999999,
+          139.425956
+        ],
+        [
+          35.389147,
+          139.425953
+        ],
+        [
+          35.38915,
+          139.425935
+        ],
+        [
+          35.389102,
+          139.425935
+        ],
+        [
+          35.389102,
+          139.425827
+        ],
+        [
+          35.389059,
+          139.425827
+        ],
+        [
+          35.389059,
+          139.42572
+        ],
+        [
+          35.388971,
+          139.42572
+        ],
+        [
+          35.388971,
+          139.425666
+        ],
+        [
+          35.388884,
+          139.425666
+        ],
+        [
+          35.388884,
+          139.425613
+        ],
+        [
+          35.388753,
+          139.425613
+        ],
+        [
+          35.388753,
+          139.425559
+        ],
+        [
+          35.388665,
+          139.425559
+        ],
+        [
+          35.388665,
+          139.425505
+        ],
+        [
+          35.388534,
+          139.425505
+        ],
+        [
+          35.388534,
+          139.425452
+        ],
+        [
+          35.388403,
+          139.425452
+        ],
+        [
+          35.388403,
+          139.425398
+        ],
+        [
+          35.388272,
+          139.425398
+        ],
+        [
+          35.388272,
+          139.425344
+        ],
+        [
+          35.388097,
+          139.425344
+        ],
+        [
+          35.388097,
+          139.425291
+        ],
+        [
+          35.387878,
+          139.425291
+        ],
+        [
+          35.387878,
+          139.424969
+        ],
+        [
+          35.387834,
+          139.424969
+        ],
+        [
+          35.387834,
+          139.424915
+        ],
+        [
+          35.387789999999995,
+          139.424915
+        ],
+        [
+          35.387789999999995,
+          139.424862
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhbb2faqd0m",
+      "name": "地形 6",
+      "era": "seamlessphoto",
+      "memo": "",
+      "pts": [
+        [
+          35.388875,
+          139.430495
+        ],
+        [
+          35.388866,
+          139.430486
+        ],
+        [
+          35.388628,
+          139.43026
+        ],
+        [
+          35.388483,
+          139.430127
+        ],
+        [
+          35.388442,
+          139.430089
+        ],
+        [
+          35.388427,
+          139.429892
+        ],
+        [
+          35.388426,
+          139.429891
+        ],
+        [
+          35.38793,
+          139.429336
+        ],
+        [
+          35.387511,
+          139.428928
+        ],
+        [
+          35.38751,
+          139.428927
+        ],
+        [
+          35.387494,
+          139.428919
+        ],
+        [
+          35.387475,
+          139.428908
+        ],
+        [
+          35.386199,
+          139.428842
+        ],
+        [
+          35.385866,
+          139.428885
+        ],
+        [
+          35.386164,
+          139.429936
+        ],
+        [
+          35.386321,
+          139.429979
+        ],
+        [
+          35.386811,
+          139.430065
+        ],
+        [
+          35.386968,
+          139.430473
+        ],
+        [
+          35.386986,
+          139.430494
+        ],
+        [
+          35.387878,
+          139.430773
+        ],
+        [
+          35.38821,
+          139.431181
+        ],
+        [
+          35.388883,
+          139.430503
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhbk2u73ohm",
+      "name": "地形 7",
+      "era": "gazo4",
+      "memo": "",
+      "pts": [
+        [
+          35.389723,
+          139.424776
+        ],
+        [
+          35.389702,
+          139.424829
+        ],
+        [
+          35.38968,
+          139.424829
+        ],
+        [
+          35.38968,
+          139.424883
+        ],
+        [
+          35.38963600000001,
+          139.42491
+        ],
+        [
+          35.38963600000001,
+          139.424937
+        ],
+        [
+          35.389614,
+          139.424937
+        ],
+        [
+          35.389614,
+          139.42499
+        ],
+        [
+          35.38957,
+          139.425017
+        ],
+        [
+          35.38957,
+          139.425071
+        ],
+        [
+          35.389549,
+          139.425071
+        ],
+        [
+          35.389549,
+          139.425098
+        ],
+        [
+          35.389527,
+          139.425098
+        ],
+        [
+          35.389527,
+          139.425151
+        ],
+        [
+          35.389483,
+          139.425178
+        ],
+        [
+          35.389483,
+          139.425232
+        ],
+        [
+          35.38943900000001,
+          139.425259
+        ],
+        [
+          35.38943900000001,
+          139.425312
+        ],
+        [
+          35.389417,
+          139.425312
+        ],
+        [
+          35.389417,
+          139.425366
+        ],
+        [
+          35.389395,
+          139.425366
+        ],
+        [
+          35.389395,
+          139.42542
+        ],
+        [
+          35.389374,
+          139.42542
+        ],
+        [
+          35.389374,
+          139.425473
+        ],
+        [
+          35.389352,
+          139.425473
+        ],
+        [
+          35.389352,
+          139.425527
+        ],
+        [
+          35.38933,
+          139.425527
+        ],
+        [
+          35.38933,
+          139.425581
+        ],
+        [
+          35.389286,
+          139.425607
+        ],
+        [
+          35.389286,
+          139.425661
+        ],
+        [
+          35.389264,
+          139.425661
+        ],
+        [
+          35.389264,
+          139.425715
+        ],
+        [
+          35.389221,
+          139.425741
+        ],
+        [
+          35.389221,
+          139.425795
+        ],
+        [
+          35.389199,
+          139.425795
+        ],
+        [
+          35.389199,
+          139.425849
+        ],
+        [
+          35.389177,
+          139.425849
+        ],
+        [
+          35.389177,
+          139.425902
+        ],
+        [
+          35.389155,
+          139.425902
+        ],
+        [
+          35.389147,
+          139.425953
+        ],
+        [
+          35.389139,
+          139.425988
+        ],
+        [
+          35.389133,
+          139.42601
+        ],
+        [
+          35.389111,
+          139.42601
+        ],
+        [
+          35.389111,
+          139.42609
+        ],
+        [
+          35.389089,
+          139.42609
+        ],
+        [
+          35.389089,
+          139.426171
+        ],
+        [
+          35.389067,
+          139.426171
+        ],
+        [
+          35.389067,
+          139.426259
+        ],
+        [
+          35.38904600000001,
+          139.426269
+        ],
+        [
+          35.38904600000001,
+          139.426385
+        ],
+        [
+          35.389024,
+          139.426385
+        ],
+        [
+          35.389024,
+          139.426492
+        ],
+        [
+          35.389002,
+          139.426492
+        ],
+        [
+          35.389002,
+          139.426573
+        ],
+        [
+          35.38897,
+          139.426572
+        ],
+        [
+          35.38898,
+          139.42668
+        ],
+        [
+          35.388961,
+          139.42668
+        ],
+        [
+          35.388952,
+          139.426786
+        ],
+        [
+          35.388951,
+          139.426789
+        ],
+        [
+          35.388942,
+          139.426896
+        ],
+        [
+          35.388914,
+          139.426895
+        ],
+        [
+          35.388928,
+          139.427062
+        ],
+        [
+          35.388927,
+          139.427066
+        ],
+        [
+          35.388914,
+          139.427217
+        ],
+        [
+          35.388936,
+          139.427217
+        ],
+        [
+          35.388936,
+          139.427297
+        ],
+        [
+          35.388958,
+          139.427297
+        ],
+        [
+          35.388958,
+          139.427351
+        ],
+        [
+          35.38898,
+          139.427351
+        ],
+        [
+          35.38898,
+          139.427378
+        ],
+        [
+          35.389024,
+          139.427378
+        ],
+        [
+          35.389024,
+          139.427619
+        ],
+        [
+          35.38904600000001,
+          139.427619
+        ],
+        [
+          35.38904600000001,
+          139.427673
+        ],
+        [
+          35.389067,
+          139.427673
+        ],
+        [
+          35.389067,
+          139.427753
+        ],
+        [
+          35.389089,
+          139.427753
+        ],
+        [
+          35.389089,
+          139.427801
+        ],
+        [
+          35.389142,
+          139.427801
+        ],
+        [
+          35.389142,
+          139.427828
+        ],
+        [
+          35.389164,
+          139.427828
+        ],
+        [
+          35.389164,
+          139.427935
+        ],
+        [
+          35.389142,
+          139.427935
+        ],
+        [
+          35.389142,
+          139.427989
+        ],
+        [
+          35.389120000000005,
+          139.427989
+        ],
+        [
+          35.389120000000005,
+          139.428016
+        ],
+        [
+          35.389094,
+          139.428016
+        ],
+        [
+          35.389087999999994,
+          139.428047
+        ],
+        [
+          35.389083,
+          139.42807
+        ],
+        [
+          35.389084,
+          139.428123
+        ],
+        [
+          35.389089,
+          139.428424
+        ],
+        [
+          35.389111,
+          139.428424
+        ],
+        [
+          35.389111,
+          139.42845
+        ],
+        [
+          35.389089,
+          139.42845
+        ],
+        [
+          35.389089,
+          139.428606
+        ],
+        [
+          35.389142,
+          139.428606
+        ],
+        [
+          35.389142,
+          139.428821
+        ],
+        [
+          35.389120000000005,
+          139.428821
+        ],
+        [
+          35.389120000000005,
+          139.428928
+        ],
+        [
+          35.389098,
+          139.428928
+        ],
+        [
+          35.389098,
+          139.429008
+        ],
+        [
+          35.38907199999999,
+          139.429008
+        ],
+        [
+          35.389067,
+          139.429062
+        ],
+        [
+          35.38906,
+          139.429095
+        ],
+        [
+          35.389177,
+          139.4291
+        ],
+        [
+          35.389188,
+          139.429067
+        ],
+        [
+          35.389199,
+          139.429067
+        ],
+        [
+          35.389199,
+          139.42888
+        ],
+        [
+          35.389221,
+          139.42888
+        ],
+        [
+          35.389221,
+          139.428638
+        ],
+        [
+          35.389199,
+          139.428638
+        ],
+        [
+          35.389199,
+          139.428102
+        ],
+        [
+          35.389221,
+          139.428102
+        ],
+        [
+          35.389221,
+          139.42786
+        ],
+        [
+          35.389199,
+          139.42786
+        ],
+        [
+          35.389199,
+          139.427565
+        ],
+        [
+          35.389221,
+          139.427565
+        ],
+        [
+          35.389221,
+          139.427378
+        ],
+        [
+          35.389199,
+          139.427378
+        ],
+        [
+          35.389199,
+          139.42727
+        ],
+        [
+          35.389177,
+          139.42727
+        ],
+        [
+          35.389177,
+          139.42719
+        ],
+        [
+          35.389155,
+          139.42719
+        ],
+        [
+          35.389155,
+          139.427136
+        ],
+        [
+          35.389133,
+          139.427136
+        ],
+        [
+          35.389133,
+          139.427083
+        ],
+        [
+          35.389111,
+          139.427083
+        ],
+        [
+          35.389111,
+          139.426922
+        ],
+        [
+          35.389133,
+          139.426922
+        ],
+        [
+          35.389133,
+          139.426814
+        ],
+        [
+          35.389089,
+          139.426814
+        ],
+        [
+          35.389089,
+          139.426787
+        ],
+        [
+          35.389067,
+          139.426787
+        ],
+        [
+          35.389067,
+          139.426814
+        ],
+        [
+          35.38904600000001,
+          139.426814
+        ],
+        [
+          35.38904600000001,
+          139.426761
+        ],
+        [
+          35.389067,
+          139.426761
+        ],
+        [
+          35.389067,
+          139.426653
+        ],
+        [
+          35.389089,
+          139.426653
+        ],
+        [
+          35.389089,
+          139.426546
+        ],
+        [
+          35.389111,
+          139.426546
+        ],
+        [
+          35.389111,
+          139.426466
+        ],
+        [
+          35.389133,
+          139.426466
+        ],
+        [
+          35.389133,
+          139.426358
+        ],
+        [
+          35.389155,
+          139.426358
+        ],
+        [
+          35.38915,
+          139.426256
+        ],
+        [
+          35.38915,
+          139.426251
+        ],
+        [
+          35.389177,
+          139.426251
+        ],
+        [
+          35.389177,
+          139.426203
+        ],
+        [
+          35.38918,
+          139.426203
+        ],
+        [
+          35.389189,
+          139.426175
+        ],
+        [
+          35.38919,
+          139.42617
+        ],
+        [
+          35.389195,
+          139.42609
+        ],
+        [
+          35.389221,
+          139.42609
+        ],
+        [
+          35.389221,
+          139.426036
+        ],
+        [
+          35.38924200000001,
+          139.426036
+        ],
+        [
+          35.38924200000001,
+          139.425983
+        ],
+        [
+          35.389264,
+          139.425983
+        ],
+        [
+          35.389264,
+          139.425902
+        ],
+        [
+          35.389308,
+          139.425876
+        ],
+        [
+          35.389308,
+          139.425822
+        ],
+        [
+          35.38933,
+          139.425822
+        ],
+        [
+          35.38933,
+          139.425768
+        ],
+        [
+          35.389374,
+          139.425741
+        ],
+        [
+          35.389374,
+          139.425688
+        ],
+        [
+          35.389395,
+          139.425688
+        ],
+        [
+          35.389395,
+          139.425634
+        ],
+        [
+          35.389417,
+          139.425634
+        ],
+        [
+          35.389417,
+          139.425581
+        ],
+        [
+          35.38943900000001,
+          139.425581
+        ],
+        [
+          35.38943900000001,
+          139.425527
+        ],
+        [
+          35.389461,
+          139.425527
+        ],
+        [
+          35.389461,
+          139.425473
+        ],
+        [
+          35.389483,
+          139.425473
+        ],
+        [
+          35.389483,
+          139.42542
+        ],
+        [
+          35.389527,
+          139.425393
+        ],
+        [
+          35.389527,
+          139.425339
+        ],
+        [
+          35.389549,
+          139.425339
+        ],
+        [
+          35.389549,
+          139.425285
+        ],
+        [
+          35.389592,
+          139.425259
+        ],
+        [
+          35.389592,
+          139.425205
+        ],
+        [
+          35.38963600000001,
+          139.425178
+        ],
+        [
+          35.38963600000001,
+          139.425125
+        ],
+        [
+          35.38968,
+          139.425098
+        ],
+        [
+          35.38968,
+          139.425044
+        ],
+        [
+          35.389723,
+          139.425017
+        ],
+        [
+          35.389723,
+          139.424964
+        ],
+        [
+          35.389767,
+          139.424937
+        ],
+        [
+          35.389767,
+          139.42491
+        ],
+        [
+          35.389789,
+          139.42491
+        ],
+        [
+          35.389789,
+          139.424856
+        ],
+        [
+          35.389811,
+          139.424856
+        ],
+        [
+          35.389811,
+          139.424829
+        ],
+        [
+          35.389789,
+          139.424829
+        ],
+        [
+          35.389789,
+          139.424776
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhblhcqeyp8",
+      "name": "地形 8",
+      "era": "seamlessphoto",
+      "memo": "",
+      "pts": [
+        [
+          35.387178,
+          139.425613
+        ],
+        [
+          35.387099,
+          139.426149
+        ],
+        [
+          35.38689,
+          139.426203
+        ],
+        [
+          35.386886,
+          139.426259
+        ],
+        [
+          35.386809,
+          139.427313
+        ],
+        [
+          35.386809,
+          139.427314
+        ],
+        [
+          35.386891,
+          139.427813
+        ],
+        [
+          35.386907,
+          139.42801
+        ],
+        [
+          35.385456,
+          139.427865
+        ],
+        [
+          35.385455,
+          139.427864
+        ],
+        [
+          35.3854,
+          139.427583
+        ],
+        [
+          35.3854,
+          139.42758
+        ],
+        [
+          35.385306,
+          139.427222
+        ],
+        [
+          35.385256,
+          139.42722
+        ],
+        [
+          35.385255,
+          139.427219
+        ],
+        [
+          35.385255,
+          139.427218
+        ],
+        [
+          35.384609,
+          139.427218
+        ],
+        [
+          35.384608,
+          139.427218
+        ],
+        [
+          35.384607,
+          139.426814
+        ],
+        [
+          35.384834,
+          139.426396
+        ],
+        [
+          35.384913,
+          139.425999
+        ],
+        [
+          35.384913,
+          139.425398
+        ],
+        [
+          35.385106,
+          139.424944
+        ],
+        [
+          35.385108,
+          139.424942
+        ],
+        [
+          35.385128,
+          139.424912
+        ],
+        [
+          35.385128,
+          139.424911
+        ],
+        [
+          35.386137,
+          139.424368
+        ],
+        [
+          35.386369,
+          139.424462
+        ],
+        [
+          35.386859,
+          139.42466
+        ],
+        [
+          35.386862,
+          139.424661
+        ],
+        [
+          35.386863,
+          139.424661
+        ],
+        [
+          35.38698,
+          139.424713
+        ],
+        [
+          35.386981,
+          139.424713
+        ],
+        [
+          35.387511,
+          139.425044
+        ],
+        [
+          35.387221,
+          139.425126
+        ],
+        [
+          35.387003,
+          139.425183
+        ],
+        [
+          35.386771,
+          139.425243
+        ],
+        [
+          35.386741,
+          139.425251
+        ],
+        [
+          35.386741,
+          139.425253
+        ],
+        [
+          35.38674,
+          139.425253
+        ],
+        [
+          35.386715,
+          139.425259
+        ],
+        [
+          35.386699,
+          139.425344
+        ],
+        [
+          35.386696,
+          139.425446
+        ],
+        [
+          35.386696,
+          139.425452
+        ],
+        [
+          35.386696,
+          139.425455
+        ],
+        [
+          35.38674,
+          139.425469
+        ],
+        [
+          35.386741,
+          139.425469
+        ],
+        [
+          35.386742,
+          139.425476
+        ],
+        [
+          35.386787,
+          139.425496
+        ],
+        [
+          35.386998,
+          139.425559
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhbnydhiibz",
+      "name": "地形 9",
+      "era": "gazo4",
+      "memo": "",
+      "pts": [
+        [
+          35.389089,
+          139.427801
+        ],
+        [
+          35.389087999999994,
+          139.427805
+        ],
+        [
+          35.389083,
+          139.427828
+        ],
+        [
+          35.38905400000001,
+          139.427828
+        ],
+        [
+          35.38905400000001,
+          139.427909
+        ],
+        [
+          35.389032,
+          139.427909
+        ],
+        [
+          35.389032,
+          139.427935
+        ],
+        [
+          35.389011,
+          139.427935
+        ],
+        [
+          35.389011,
+          139.427962
+        ],
+        [
+          35.388988999999995,
+          139.427962
+        ],
+        [
+          35.388988999999995,
+          139.427989
+        ],
+        [
+          35.388967,
+          139.427989
+        ],
+        [
+          35.388967,
+          139.428016
+        ],
+        [
+          35.388945,
+          139.428016
+        ],
+        [
+          35.388945,
+          139.428043
+        ],
+        [
+          35.388923000000005,
+          139.428043
+        ],
+        [
+          35.388923000000005,
+          139.42807
+        ],
+        [
+          35.388901,
+          139.42807
+        ],
+        [
+          35.388901,
+          139.428096
+        ],
+        [
+          35.38885799999999,
+          139.428096
+        ],
+        [
+          35.38885799999999,
+          139.428123
+        ],
+        [
+          35.388836,
+          139.428123
+        ],
+        [
+          35.388836,
+          139.42815
+        ],
+        [
+          35.388814,
+          139.42815
+        ],
+        [
+          35.388814,
+          139.428204
+        ],
+        [
+          35.388791999999995,
+          139.428204
+        ],
+        [
+          35.388791999999995,
+          139.428231
+        ],
+        [
+          35.38877,
+          139.428231
+        ],
+        [
+          35.38877,
+          139.428257
+        ],
+        [
+          35.388748,
+          139.428257
+        ],
+        [
+          35.388748,
+          139.428311
+        ],
+        [
+          35.388726000000005,
+          139.428311
+        ],
+        [
+          35.388726000000005,
+          139.428338
+        ],
+        [
+          35.388704,
+          139.428338
+        ],
+        [
+          35.388704,
+          139.428391
+        ],
+        [
+          35.388683,
+          139.428391
+        ],
+        [
+          35.388683,
+          139.428418
+        ],
+        [
+          35.38866099999999,
+          139.428418
+        ],
+        [
+          35.38866099999999,
+          139.428472
+        ],
+        [
+          35.388639,
+          139.428472
+        ],
+        [
+          35.388639,
+          139.428499
+        ],
+        [
+          35.388617,
+          139.428499
+        ],
+        [
+          35.388617,
+          139.428526
+        ],
+        [
+          35.388594999999995,
+          139.428526
+        ],
+        [
+          35.388594999999995,
+          139.428579
+        ],
+        [
+          35.388573,
+          139.428579
+        ],
+        [
+          35.388573,
+          139.428606
+        ],
+        [
+          35.388551,
+          139.428606
+        ],
+        [
+          35.388551,
+          139.428633
+        ],
+        [
+          35.38853,
+          139.428633
+        ],
+        [
+          35.38853,
+          139.42866
+        ],
+        [
+          35.388486,
+          139.42866
+        ],
+        [
+          35.388486,
+          139.428633
+        ],
+        [
+          35.38846399999999,
+          139.428633
+        ],
+        [
+          35.38846399999999,
+          139.42866
+        ],
+        [
+          35.38842,
+          139.42866
+        ],
+        [
+          35.388405999999996,
+          139.42874
+        ],
+        [
+          35.388409,
+          139.428745
+        ],
+        [
+          35.388411,
+          139.428748
+        ],
+        [
+          35.388442,
+          139.42874
+        ],
+        [
+          35.388451,
+          139.428812
+        ],
+        [
+          35.388486,
+          139.428821
+        ],
+        [
+          35.388478,
+          139.428855
+        ],
+        [
+          35.388573,
+          139.428847
+        ],
+        [
+          35.388573,
+          139.428874
+        ],
+        [
+          35.388594999999995,
+          139.428874
+        ],
+        [
+          35.388594999999995,
+          139.428928
+        ],
+        [
+          35.388617,
+          139.428928
+        ],
+        [
+          35.388617,
+          139.429035
+        ],
+        [
+          35.388639,
+          139.429035
+        ],
+        [
+          35.388639,
+          139.429142
+        ],
+        [
+          35.38866099999999,
+          139.429142
+        ],
+        [
+          35.388649,
+          139.429229
+        ],
+        [
+          35.388683,
+          139.429223
+        ],
+        [
+          35.388683,
+          139.42933
+        ],
+        [
+          35.388704,
+          139.42933
+        ],
+        [
+          35.388701,
+          139.429385
+        ],
+        [
+          35.388726000000005,
+          139.429384
+        ],
+        [
+          35.38872,
+          139.429441
+        ],
+        [
+          35.388748,
+          139.429438
+        ],
+        [
+          35.388746,
+          139.429519
+        ],
+        [
+          35.38877,
+          139.429518
+        ],
+        [
+          35.38877,
+          139.429593
+        ],
+        [
+          35.388772,
+          139.429597
+        ],
+        [
+          35.388791999999995,
+          139.429598
+        ],
+        [
+          35.388796,
+          139.42965
+        ],
+        [
+          35.388801,
+          139.429661
+        ],
+        [
+          35.38882,
+          139.429702
+        ],
+        [
+          35.388825000000004,
+          139.429714
+        ],
+        [
+          35.388834,
+          139.429734
+        ],
+        [
+          35.38885799999999,
+          139.429733
+        ],
+        [
+          35.38885799999999,
+          139.429786
+        ],
+        [
+          35.388879,
+          139.429786
+        ],
+        [
+          35.388890999999994,
+          139.429859
+        ],
+        [
+          35.388896,
+          139.429871
+        ],
+        [
+          35.388914,
+          139.429911
+        ],
+        [
+          35.388919,
+          139.429922
+        ],
+        [
+          35.388923000000005,
+          139.430001
+        ],
+        [
+          35.38895,
+          139.429982
+        ],
+        [
+          35.388952,
+          139.429984
+        ],
+        [
+          35.388945,
+          139.430081
+        ],
+        [
+          35.389032,
+          139.430081
+        ],
+        [
+          35.389032,
+          139.429893
+        ],
+        [
+          35.389011,
+          139.429893
+        ],
+        [
+          35.389011,
+          139.42984
+        ],
+        [
+          35.388988999999995,
+          139.42984
+        ],
+        [
+          35.388988999999995,
+          139.429759
+        ],
+        [
+          35.388967,
+          139.429759
+        ],
+        [
+          35.388967,
+          139.429706
+        ],
+        [
+          35.388945,
+          139.429706
+        ],
+        [
+          35.388945,
+          139.429652
+        ],
+        [
+          35.388923000000005,
+          139.429652
+        ],
+        [
+          35.388923000000005,
+          139.429625
+        ],
+        [
+          35.388901,
+          139.429625
+        ],
+        [
+          35.388901,
+          139.429572
+        ],
+        [
+          35.388879,
+          139.429572
+        ],
+        [
+          35.388879,
+          139.429518
+        ],
+        [
+          35.38885799999999,
+          139.429518
+        ],
+        [
+          35.38885799999999,
+          139.429438
+        ],
+        [
+          35.388836,
+          139.429438
+        ],
+        [
+          35.388836,
+          139.429357
+        ],
+        [
+          35.388814,
+          139.429357
+        ],
+        [
+          35.388814,
+          139.42929
+        ],
+        [
+          35.388791999999995,
+          139.42929
+        ],
+        [
+          35.388791999999995,
+          139.42925
+        ],
+        [
+          35.38877,
+          139.42925
+        ],
+        [
+          35.38877,
+          139.429223
+        ],
+        [
+          35.388748,
+          139.429223
+        ],
+        [
+          35.38875899999999,
+          139.429196
+        ],
+        [
+          35.388726000000005,
+          139.429196
+        ],
+        [
+          35.388737,
+          139.429116
+        ],
+        [
+          35.388726000000005,
+          139.429008
+        ],
+        [
+          35.388726000000005,
+          139.428982
+        ],
+        [
+          35.388737,
+          139.428955
+        ],
+        [
+          35.388726000000005,
+          139.428901
+        ],
+        [
+          35.388704,
+          139.428901
+        ],
+        [
+          35.388704,
+          139.428821
+        ],
+        [
+          35.388694,
+          139.428821
+        ],
+        [
+          35.388683,
+          139.428794
+        ],
+        [
+          35.388672,
+          139.428794
+        ],
+        [
+          35.388672,
+          139.428767
+        ],
+        [
+          35.388639,
+          139.428767
+        ],
+        [
+          35.38865,
+          139.42874
+        ],
+        [
+          35.38865,
+          139.428686
+        ],
+        [
+          35.38866099999999,
+          139.428686
+        ],
+        [
+          35.38866099999999,
+          139.42866
+        ],
+        [
+          35.388672,
+          139.428633
+        ],
+        [
+          35.388683,
+          139.428633
+        ],
+        [
+          35.388694,
+          139.428606
+        ],
+        [
+          35.388704,
+          139.428606
+        ],
+        [
+          35.388715,
+          139.428579
+        ],
+        [
+          35.388726000000005,
+          139.428579
+        ],
+        [
+          35.388737,
+          139.428552
+        ],
+        [
+          35.388748,
+          139.428552
+        ],
+        [
+          35.388748,
+          139.428499
+        ],
+        [
+          35.388781,
+          139.428499
+        ],
+        [
+          35.388781,
+          139.428472
+        ],
+        [
+          35.38877,
+          139.428445
+        ],
+        [
+          35.388803,
+          139.428445
+        ],
+        [
+          35.388803,
+          139.428418
+        ],
+        [
+          35.388814,
+          139.428418
+        ],
+        [
+          35.388825000000004,
+          139.428365
+        ],
+        [
+          35.388836,
+          139.428365
+        ],
+        [
+          35.388847,
+          139.428338
+        ],
+        [
+          35.38885799999999,
+          139.428338
+        ],
+        [
+          35.38885799999999,
+          139.428311
+        ],
+        [
+          35.388879,
+          139.428311
+        ],
+        [
+          35.388879,
+          139.428257
+        ],
+        [
+          35.388901,
+          139.428257
+        ],
+        [
+          35.388901,
+          139.428231
+        ],
+        [
+          35.388923000000005,
+          139.428231
+        ],
+        [
+          35.388923000000005,
+          139.428218
+        ],
+        [
+          35.388978,
+          139.428204
+        ],
+        [
+          35.388978,
+          139.428177
+        ],
+        [
+          35.388988999999995,
+          139.428177
+        ],
+        [
+          35.388988999999995,
+          139.42815
+        ],
+        [
+          35.388991,
+          139.42815
+        ],
+        [
+          35.389,
+          139.428123
+        ],
+        [
+          35.388988999999995,
+          139.428096
+        ],
+        [
+          35.38905400000001,
+          139.428096
+        ],
+        [
+          35.38905400000001,
+          139.428083
+        ],
+        [
+          35.38907999999999,
+          139.428083
+        ],
+        [
+          35.389083,
+          139.42807
+        ],
+        [
+          35.389087999999994,
+          139.428047
+        ],
+        [
+          35.389089,
+          139.428043
+        ],
+        [
+          35.389089,
+          139.428041
+        ],
+        [
+          35.389094,
+          139.428016
+        ],
+        [
+          35.389120000000005,
+          139.428016
+        ],
+        [
+          35.389120000000005,
+          139.427989
+        ],
+        [
+          35.389142,
+          139.427989
+        ],
+        [
+          35.389142,
+          139.427935
+        ],
+        [
+          35.389164,
+          139.427935
+        ],
+        [
+          35.389164,
+          139.427828
+        ],
+        [
+          35.389142,
+          139.427828
+        ],
+        [
+          35.389142,
+          139.427801
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhbq1ck6fwz",
+      "name": "地形 10",
+      "era": "gazo4",
+      "memo": "",
+      "pts": [
+        [
+          35.389636,
+          139.428992
+        ],
+        [
+          35.389636,
+          139.429153
+        ],
+        [
+          35.38933,
+          139.429153
+        ],
+        [
+          35.38933,
+          139.429207
+        ],
+        [
+          35.389199,
+          139.429207
+        ],
+        [
+          35.389199,
+          139.42926
+        ],
+        [
+          35.389032,
+          139.42926
+        ],
+        [
+          35.389028,
+          139.42926
+        ],
+        [
+          35.389024,
+          139.429198
+        ],
+        [
+          35.389024,
+          139.429196
+        ],
+        [
+          35.389024,
+          139.429142
+        ],
+        [
+          35.389024,
+          139.42914
+        ],
+        [
+          35.389028,
+          139.4291
+        ],
+        [
+          35.389032,
+          139.4291
+        ],
+        [
+          35.38906,
+          139.429095
+        ],
+        [
+          35.389177,
+          139.4291
+        ],
+        [
+          35.389199,
+          139.4291
+        ],
+        [
+          35.389199,
+          139.429067
+        ],
+        [
+          35.389199,
+          139.429046
+        ],
+        [
+          35.38933,
+          139.429046
+        ],
+        [
+          35.38933,
+          139.428992
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhbzj2i37nb",
+      "name": "地形 11",
+      "era": "ort_old10",
+      "memo": "",
+      "pts": [
+        [
+          35.389051,
+          139.428606
+        ],
+        [
+          35.389043,
+          139.428633
+        ],
+        [
+          35.38905400000001,
+          139.42866
+        ],
+        [
+          35.389011,
+          139.42866
+        ],
+        [
+          35.389011,
+          139.428686
+        ],
+        [
+          35.388988999999995,
+          139.428686
+        ],
+        [
+          35.388988999999995,
+          139.428713
+        ],
+        [
+          35.388967,
+          139.428713
+        ],
+        [
+          35.388967,
+          139.42874
+        ],
+        [
+          35.388945,
+          139.42874
+        ],
+        [
+          35.388945,
+          139.428767
+        ],
+        [
+          35.388923000000005,
+          139.428767
+        ],
+        [
+          35.388901,
+          139.428767
+        ],
+        [
+          35.388901,
+          139.428794
+        ],
+        [
+          35.388889999999996,
+          139.428821
+        ],
+        [
+          35.388879,
+          139.428821
+        ],
+        [
+          35.388869,
+          139.428847
+        ],
+        [
+          35.38885799999999,
+          139.428847
+        ],
+        [
+          35.388836,
+          139.428847
+        ],
+        [
+          35.388836,
+          139.428849
+        ],
+        [
+          35.388836,
+          139.428851
+        ],
+        [
+          35.388836,
+          139.42886
+        ],
+        [
+          35.388814,
+          139.42886
+        ],
+        [
+          35.388814,
+          139.428901
+        ],
+        [
+          35.388791999999995,
+          139.428901
+        ],
+        [
+          35.388791999999995,
+          139.428928
+        ],
+        [
+          35.38877,
+          139.428928
+        ],
+        [
+          35.38877,
+          139.428955
+        ],
+        [
+          35.388737,
+          139.428955
+        ],
+        [
+          35.388748,
+          139.428995
+        ],
+        [
+          35.388726000000005,
+          139.428982
+        ],
+        [
+          35.388726000000005,
+          139.429008
+        ],
+        [
+          35.388737,
+          139.429116
+        ],
+        [
+          35.388726000000005,
+          139.429196
+        ],
+        [
+          35.38875899999999,
+          139.429196
+        ],
+        [
+          35.388748,
+          139.429223
+        ],
+        [
+          35.38877,
+          139.429223
+        ],
+        [
+          35.38877,
+          139.42925
+        ],
+        [
+          35.388791999999995,
+          139.42925
+        ],
+        [
+          35.388791999999995,
+          139.429277
+        ],
+        [
+          35.388791999999995,
+          139.429279
+        ],
+        [
+          35.388791999999995,
+          139.429281
+        ],
+        [
+          35.388814,
+          139.42929
+        ],
+        [
+          35.388836,
+          139.429277
+        ],
+        [
+          35.388836,
+          139.429303
+        ],
+        [
+          35.389011,
+          139.429303
+        ],
+        [
+          35.389011,
+          139.429277
+        ],
+        [
+          35.389032,
+          139.42926
+        ],
+        [
+          35.389028,
+          139.42926
+        ],
+        [
+          35.389024,
+          139.429198
+        ],
+        [
+          35.389024,
+          139.429197
+        ],
+        [
+          35.389024,
+          139.429196
+        ],
+        [
+          35.389024,
+          139.429142
+        ],
+        [
+          35.389024,
+          139.429141
+        ],
+        [
+          35.389024,
+          139.42914
+        ],
+        [
+          35.389028,
+          139.4291
+        ],
+        [
+          35.389032,
+          139.4291
+        ],
+        [
+          35.38906,
+          139.429095
+        ],
+        [
+          35.38906,
+          139.429093
+        ],
+        [
+          35.389066,
+          139.429066
+        ],
+        [
+          35.389067,
+          139.429062
+        ],
+        [
+          35.389067,
+          139.429061
+        ],
+        [
+          35.38907199999999,
+          139.429008
+        ],
+        [
+          35.389098,
+          139.429008
+        ],
+        [
+          35.389098,
+          139.428928
+        ],
+        [
+          35.389120000000005,
+          139.428928
+        ],
+        [
+          35.389120000000005,
+          139.428821
+        ],
+        [
+          35.389142,
+          139.428821
+        ],
+        [
+          35.389142,
+          139.428606
+        ],
+        [
+          35.389089,
+          139.428606
+        ],
+        [
+          35.389065,
+          139.428606
+        ],
+        [
+          35.38905400000001,
+          139.428606
+        ],
+        [
+          35.389052,
+          139.428606
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    },
+    {
+      "id": "smwhc08yseeju",
+      "name": "地形 12",
+      "era": "gazo2",
+      "memo": "",
+      "pts": [
+        [
+          35.388945,
+          139.42874
+        ],
+        [
+          35.388967,
+          139.42874
+        ],
+        [
+          35.388967,
+          139.428713
+        ],
+        [
+          35.388989,
+          139.428713
+        ],
+        [
+          35.388989,
+          139.428686
+        ],
+        [
+          35.389011,
+          139.428686
+        ],
+        [
+          35.389011,
+          139.42866
+        ],
+        [
+          35.389054,
+          139.42866
+        ],
+        [
+          35.389043,
+          139.428633
+        ],
+        [
+          35.389051,
+          139.428606
+        ],
+        [
+          35.389052,
+          139.428606
+        ],
+        [
+          35.389054,
+          139.428606
+        ],
+        [
+          35.389054,
+          139.428579
+        ],
+        [
+          35.389076,
+          139.428579
+        ],
+        [
+          35.389076,
+          139.428499
+        ],
+        [
+          35.389089,
+          139.428499
+        ],
+        [
+          35.389089,
+          139.42845
+        ],
+        [
+          35.389098,
+          139.42845
+        ],
+        [
+          35.389098,
+          139.428424
+        ],
+        [
+          35.389089,
+          139.428424
+        ],
+        [
+          35.389084,
+          139.428123
+        ],
+        [
+          35.389076,
+          139.428123
+        ],
+        [
+          35.389076,
+          139.428083
+        ],
+        [
+          35.389054,
+          139.428094
+        ],
+        [
+          35.389054,
+          139.428096
+        ],
+        [
+          35.389032,
+          139.428096
+        ],
+        [
+          35.388989,
+          139.428096
+        ],
+        [
+          35.389,
+          139.428123
+        ],
+        [
+          35.388991,
+          139.42815
+        ],
+        [
+          35.388989,
+          139.42815
+        ],
+        [
+          35.388989,
+          139.428177
+        ],
+        [
+          35.388987,
+          139.428177
+        ],
+        [
+          35.388978,
+          139.428204
+        ],
+        [
+          35.388989,
+          139.428231
+        ],
+        [
+          35.388923,
+          139.428231
+        ],
+        [
+          35.388901,
+          139.428231
+        ],
+        [
+          35.388901,
+          139.428257
+        ],
+        [
+          35.388879,
+          139.428257
+        ],
+        [
+          35.388879,
+          139.428284
+        ],
+        [
+          35.388879,
+          139.428311
+        ],
+        [
+          35.388858,
+          139.428311
+        ],
+        [
+          35.388858,
+          139.428338
+        ],
+        [
+          35.388858,
+          139.428365
+        ],
+        [
+          35.388836,
+          139.428365
+        ],
+        [
+          35.388836,
+          139.428418
+        ],
+        [
+          35.388814,
+          139.428418
+        ],
+        [
+          35.388812,
+          139.428418
+        ],
+        [
+          35.388803,
+          139.428445
+        ],
+        [
+          35.388814,
+          139.428472
+        ],
+        [
+          35.388781,
+          139.428472
+        ],
+        [
+          35.388781,
+          139.428499
+        ],
+        [
+          35.388792,
+          139.428526
+        ],
+        [
+          35.38877,
+          139.428526
+        ],
+        [
+          35.38877,
+          139.428552
+        ],
+        [
+          35.388748,
+          139.428552
+        ],
+        [
+          35.388748,
+          139.428579
+        ],
+        [
+          35.388726,
+          139.428579
+        ],
+        [
+          35.388726,
+          139.428606
+        ],
+        [
+          35.388704,
+          139.428606
+        ],
+        [
+          35.388704,
+          139.428633
+        ],
+        [
+          35.388683,
+          139.428633
+        ],
+        [
+          35.388683,
+          139.42866
+        ],
+        [
+          35.388661,
+          139.42866
+        ],
+        [
+          35.388661,
+          139.428686
+        ],
+        [
+          35.38866,
+          139.428686
+        ],
+        [
+          35.38865,
+          139.42874
+        ],
+        [
+          35.388683,
+          139.42874
+        ],
+        [
+          35.388672,
+          139.428767
+        ],
+        [
+          35.388681,
+          139.428794
+        ],
+        [
+          35.388683,
+          139.428794
+        ],
+        [
+          35.388704,
+          139.428794
+        ],
+        [
+          35.388704,
+          139.428821
+        ],
+        [
+          35.388748,
+          139.428821
+        ],
+        [
+          35.388748,
+          139.428847
+        ],
+        [
+          35.388814,
+          139.42886
+        ],
+        [
+          35.388836,
+          139.428851
+        ],
+        [
+          35.388836,
+          139.428849
+        ],
+        [
+          35.388836,
+          139.428847
+        ],
+        [
+          35.388858,
+          139.428847
+        ],
+        [
+          35.388858,
+          139.428821
+        ],
+        [
+          35.388879,
+          139.428821
+        ],
+        [
+          35.388879,
+          139.428794
+        ],
+        [
+          35.388901,
+          139.428794
+        ],
+        [
+          35.388901,
+          139.428767
+        ],
+        [
+          35.388923,
+          139.428767
+        ],
+        [
+          35.388945,
+          139.428767
+        ]
+      ],
+      "lab": null,
+      "hidden": false
+    }
+  ],
+  "shapeLabels": true,
+  "lastEra": "gazo2",
+  "ref": "",
+  "refOp": 1,
+  "sheetView": null,
+  "photoOffsets": {
+    "ort_old10": {
+      "dx": 0,
+      "dy": 0
+    },
+    "gazo1": {
+      "dx": 2.921025875881311,
+      "dy": 0
+    },
+    "gazo2": {
+      "dx": 0,
+      "dy": 0
+    },
+    "gazo4": {
+      "dx": 0,
+      "dy": 0
+    }
+  }
+}
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function(){'use strict';
+var $=function(id){return document.getElementById(id);};
+var S=JSON.parse($('work-data').textContent);
+$('title').textContent=S.title; $('rule').textContent=S.rule; $('credit').textContent=S.credit; document.title=S.title;
+if(typeof L==='undefined'){$('fatal').hidden=false;$('status').hidden=true;return;}
+  var CENTER = [35.388, 139.428];
+  var TILE = 'https://cyberjapandata.gsi.go.jp/xyz/{id}/{z}/{x}/{y}.{ext}';
+  var ATTR = '出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院（地理院タイル）</a>';
+  var KJ_TILE = 'https://ktgis.net/kjmapw/kjtilemap/tokyo50/{period}/{z}/{x}/{-y}.png';
+  var KJ_ATTR = '<a href="https://ktgis.net/kjmapw/" target="_blank" rel="noopener">今昔マップ on the web</a>';
+  var T = { est: '<span class="tag est">推定</span>', unk: '<span class="tag unk">未確認</span>', chk: '<span class="tag chk">確認</span>', good: '<span class="tag good">いいところ</span>' };
+
+  // time:true = 年代スライダーに並ぶもの。nodata:true = 2026-11-13 にキャンパス位置のタイルが 404 だったレイヤー。
+  var ERAS = [
+    // v2: ort_USA10（1945–50）と gazo3（1984–86）はキャンパス範囲が 404 のため、選択肢から外した。
+    { id: 'ort_old10', ext: 'png', time: true, maxNative: 17,
+      label: '1961–69', sub: 'モノクロ', full: '1961年〜1969年（モノクロ写真）',
+      sugata: T.est + '敷地は台地の上が畑のモザイク、斜面が林。東側に曲がった谷筋が入り込んでいるように見える（タイルを見た印象。判読は未確定）。校舎はまだ無い（開設は1990年）。',
+      good: '畑の一枚一枚が見える。人の手の跡が一番細かい時代。' },
+    { id: 'gazo1', ext: 'jpg', time: true, maxNative: 17,
+      label: '1974–78', sub: 'カラー', full: '1974年〜1978年（カラー写真）',
+      sugata: T.est + '丘は林と畑のまま。色がついて、林の濃い緑・畑の茶と緑・谷筋の明るい帯が見分けられる（タイルを見た印象）。',
+      good: '初めて色で読める。キャンパスになる前の丘の「ふつうの姿」。' },
+    { id: 'gazo2', ext: 'jpg', time: true, maxNative: 17,
+      label: '1979–83', sub: 'カラー', full: '1979年〜1983年（カラー写真）',
+      sugata: T.est + '1974–78 と大きくは変わらない農地と林（細部は未確認）。開設のおよそ10年前。',
+      good: '前の時代と見比べて「変わっていない所」を探せる。' },
+    { id: 'gazo4', ext: 'jpg', time: true, maxNative: 17,
+      label: '1987–90', sub: '開設前後', full: '1987年〜1990年（カラー写真・SFC開設前後）',
+      sugata: T.est + '校舎群はまだ写っておらず、土の色が出た面や新しい道筋が見える＝造成前〜造成の始まりに見える（タイルを見た印象）。' + T.unk + '撮影日。1990年開設のどれくらい前かは写真ごとに要確認。',
+      good: 'キャンパスになる直前の「最後の姿」。いまの建物の位置に何があったかを当てられる。' },
+    { id: 'seamlessphoto', ext: 'jpg', time: true, maxNative: 18,
+      label: '現在の写真', sub: '最新写真', full: '現在の写真（全国最新写真・シームレス）',
+      sugata: '校舎群・ループ道路・池・グラウンドがそろった今の姿。' + T.unk + '写真の撮影時点。後から増えた棟がどれかも未確認。',
+      good: '昔の跡（林の縁・谷の向き・高低差）が全部同時に見える唯一の時代。' },
+    { id: 'std', ext: 'png', maxNative: 18,
+      label: '標準地図', sub: '現在', full: '現在（標準地図）',
+      sugata: '建物の形・道・等高線・池が記号で読める今の地図。',
+      good: '記号で整理されているので、写真で見つけた跡の「名前」を確かめやすい。' },
+    { id: 'pale', ext: 'png', maxNative: 18,
+      label: '淡色地図', sub: '現在', full: '現在（淡色地図）',
+      sugata: '標準地図を薄くしたもの。窓・スワイプ・ブレンドの下敷き向き。',
+      good: '主張しないので、昔の画像を上に載せたときに昔が主役になる。' },
+    { id: 'hillshademap', ext: 'png', maxNative: 16,
+      label: '陰影起伏図', sub: '地形', full: '地形（陰影起伏図）',
+      sugata: 'いまの地面の凹凸。坂・谷筋・造成された平らな面が影で浮かぶ。' + T.unk + 'どの凹凸が元の地形の名残で、どれが造成かは、昔の写真と見比べないと分からない。',
+      good: '建物を消して「土地の形」だけを見られる。ブレンド＋乗算が合う。' },
+    { id: 'relief', ext: 'png', maxNative: 15,
+      label: '色別標高図', sub: '地形', full: '地形（色別標高図）',
+      sugata: '標高を色で塗った図。細かいズームのタイルが無いので拡大するとぼやける。',
+      good: '高い所・低い所がひと目で分かる。谷がどちらへ下るかを見るのに。' }
+  ];
+  var KJ_ERAS = [
+    ['2man','1896-1909','#00695c'], ['00','1917-1924','#00838f'],
+    ['01','1927-1939','#1565c0'], ['02','1944-1954','#283593'],
+    ['03','1965-1968','#512da8'], ['04','1975-1978','#880e4f'],
+    ['05','1983-1987','#c62828'], ['06','1992-1995','#558b2f'],
+    ['07','1998-2005','#455a64']
+  ].map(function(row){
+    return {id:'kj_'+row[0], period:row[0], konjak:true, ext:'png', minZoom:8, maxNative:15,
+      label:'地形図 '+row[1], full:'地形図 '+row[1]+'（今昔マップ）', sub:'今昔マップ',
+      color:row[2], ink:'#fff',
+      sugata:'昔の地形図を記号や等高線で読めます。年代は収録期間です。',
+      good:'昔の道・集落・土地の形を、写真や現在の地図と見比べられます。'};
+  });
+  ERAS = ERAS.concat(KJ_ERAS);
+  var ERA = Object.create(null); ERAS.forEach(function (e) { ERA[e.id] = e; });
+  var TIME_ERAS = ERAS.filter(function (e) { return e.time; });
+  var SHAPE_ERAS = [
+    { id: 'ort_old10', label: '1961–69', long: '1961–69年（モノクロ写真）', color: '#43260f', ink: '#fff' },
+    { id: 'gazo1', label: '1974–78', long: '1974–78年（カラー写真）', color: '#8a4a1b', ink: '#fff' },
+    { id: 'gazo2', label: '1979–83', long: '1979–83年（カラー写真）', color: '#c2762a', ink: '#fff' },
+    { id: 'gazo4', label: '1987–90', long: '1987–90年（カラー写真）', color: '#e0a83e', ink: '#2a1a05' },
+    { id: 'seamlessphoto', label: '現在の写真', long: '現在の写真', color: '#215b85', ink: '#fff' },
+    { id: 'std', label: '標準地図', long: '標準地図', color: '#386843', ink: '#fff' },
+    { id: 'pale', label: '淡色地図', long: '淡色地図', color: '#596575', ink: '#fff' },
+    { id: 'hillshademap', label: '陰影起伏図', long: '陰影起伏図', color: '#73508b', ink: '#fff' },
+    { id: 'relief', label: '色別標高図', long: '色別標高図', color: '#a1395c', ink: '#fff' }
+  ];
+  SHAPE_ERAS = SHAPE_ERAS.concat(KJ_ERAS.map(function(e){
+    return {id:e.id,label:e.label,long:e.full,color:e.color,ink:e.ink};
+  }));
+  var SE = Object.create(null); SHAPE_ERAS.forEach(function (e) { SE[e.id] = e; });
+
+  // 作品データは無加工で埋め込み、閲覧中の比較設定だけをメモリ上で切り替える。
+  var OFFSET_MPP17 = 40075016.68557849 * Math.cos(CENTER[0] * Math.PI / 180) / (256 * Math.pow(2,17));
+  S.photoOffsets=S.photoOffsets||{};
+  var mapEl = $('map');
+  // ズーム16でキャンパス全体が収まる。とても大きい画面だけ17。
+  function homeZoom() { return (mapEl.clientWidth >= 1500 && mapEl.clientHeight >= 1150) ? 17 : 16; }
+  var map = L.map(mapEl, {
+    center: CENTER, zoom: homeZoom(), minZoom: 15, maxZoom: 18, zoomAnimation: false, fadeAnimation: false,
+    maxBounds: [[35.3845, 139.4225], [35.3955, 139.4355]], maxBoundsViscosity: 1,
+    zoomControl: true, attributionControl: true
+  });
+  map.attributionControl.setPrefix(false);
+  map.attributionControl.addAttribution(ATTR);   // 常時表示（レイヤーを替えても消えない）
+  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+
+  var eraPane = map.createPane('era');
+  eraPane.style.zIndex = 250;
+  eraPane.style.pointerEvents = 'none';
+  var basePane = map.getPane('tilePane');
+
+  function offsetPixels(id, zoom) {
+    var o = S.photoOffsets[id] || {dx:0,dy:0};
+    var mpp = OFFSET_MPP17 * Math.pow(2,17-zoom);
+    return {dx:o.dx/mpp,dy:o.dy/mpp};
+  }
+  // Each destination tile samples all intersecting source tiles. No container
+  // translation: pane clips, polygon vertices and viewport edges stay fixed.
+  var PhotoLayer = L.TileLayer.extend({
+    createTile: function(coords, done) {
+      var canvas = document.createElement('canvas'), size = this.getTileSize();
+      canvas.width = size.x; canvas.height = size.y;
+      var ctx = canvas.getContext('2d'), o = offsetPixels(this.options.photoEra,coords.z);
+      var left = coords.x*size.x-o.dx, top = coords.y*size.y-o.dy;
+      var x0=Math.floor(left/size.x), x1=Math.ceil((left+size.x)/size.x)-1;
+      var y0=Math.floor(top/size.y), y1=Math.ceil((top+size.y)/size.y)-1;
+      var pending=(x1-x0+1)*(y1-y0+1), failure=null, layer=this;
+      function finish(error) { if(error)failure=error; if(--pending===0)done(failure,canvas); }
+      for(var y=y0;y<=y1;y++)for(var x=x0;x<=x1;x++)(function(tx,ty){
+        var n=Math.pow(2,coords.z);
+        if(ty<0 || ty>=n){finish(new Error('写真の範囲外'));return;}
+        var source=L.point(((tx%n)+n)%n,ty);source.z=coords.z;
+        var img=new Image();
+        img.onload=function(){ctx.drawImage(img,tx*size.x-left,ty*size.y-top,size.x,size.y);finish(null);};
+        img.onerror=function(){finish(new Error('写真タイルを取得できません'));};
+        var era=ERA[layer.options.photoEra];
+        if(era.konjak){
+          // キャンバス取得：南西原点TMSなのでXYZのyを自分で反転する。
+          var y_tms=(Math.pow(2,source.z)-1)-source.y;
+          img.crossOrigin='anonymous';
+          img.src=KJ_TILE.replace('{period}',era.period).replace('{z}',source.z).replace('{x}',source.x).replace('{-y}',y_tms);
+        }else img.src=layer.getTileUrl(source);
+      })(x,y);
+      return canvas;
+    }
+  });
+  function makeLayer(e, pane) {
+    // LeafletはmaxNativeZoomで元タイルのズームを制限し、切り抜き内でも拡大する。
+    var Layer = e.konjak || (e.time && e.id!=='seamlessphoto') ? PhotoLayer : L.TileLayer;
+    // Leaflet表示経路：{-y} がXYZのyをTMSのyへ反転する。
+    var url=e.konjak ? KJ_TILE.replace('{period}',e.period) : TILE.replace('{id}',e.id).replace('{ext}',e.ext);
+    return new Layer(url, {
+      pane: pane, minZoom: e.minZoom || 5, crossOrigin: e.konjak ? 'anonymous' : false, maxZoom: 18, maxNativeZoom: e.maxNative, keepBuffer: 1, photoEra:e.id
+    });
+  }
+
+  map.attributionControl.addAttribution(KJ_ATTR);
+  var baseLayer=null,eraLayer=null,shapeViews=[];
+  var ring=$('lensRing'),handle=$('swipe'),lblL=$('lblL'),lblR=$('lblR');
+  var lensLL=L.latLng(CENTER);
+  function h(tag,attrs,kids){var el=document.createElement(tag);Object.keys(attrs||{}).forEach(function(k){if(k==='text')el.textContent=attrs[k];else if(k in el)el[k]=attrs[k];else el.setAttribute(k,attrs[k]);});(kids||[]).forEach(function(c){el.append(c);});return el;}
+  function status(){
+    var layers=[baseLayer,eraLayer].concat(shapeViews.map(function(v){return v.layer;})).filter(Boolean);
+    var failed=layers.some(function(l){return l.failed && l.failed.size;});
+    $('status').className=failed?'none':'';
+    $('status').textContent=navigator.onLine===false?'オフライン：接続後に画像を再読み込みします':failed?'画像の一部を取得できません。斜線部分は欠損です':layers.some(function(l){return l.isLoading();})?'画像を読み込み中…':'形 '+S.shapes.filter(function(s){return !s.hidden;}).length+'個を表示中';
+  }
+  function track(layer){layer.failed=new Set();function key(e){return e.coords.z+'/'+e.coords.x+'/'+e.coords.y;}layer.on('loading load',status);layer.on('tileerror',function(e){layer.failed.add(key(e));status();});layer.on('tileload tileunload',function(e){layer.failed.delete(key(e));status();});return layer;}
+  function setBase(id){if(!ERA[id])return;S.base=id;if(baseLayer)map.removeLayer(baseLayer);baseLayer=track(makeLayer(ERA[id],'tilePane')).addTo(map);$('baseSelect').value=id;updateLabels();status();}
+  function setEra(id){if(!ERA[id])return;S.era=id;if(eraLayer)map.removeLayer(eraLayer);eraLayer=track(makeLayer(ERA[id],'era')).addTo(map);$('eraSelect').value=id;updateLabels();applyClip();status();}
+  function setClip(v) { eraPane.style.clipPath = v; eraPane.style.webkitClipPath = v; }
+  function applyClip() {
+    var size = map.getSize();
+    if (S.mode === 'lens') {
+      var c = map.latLngToLayerPoint(lensLL), cc = map.latLngToContainerPoint(lensLL);
+      setClip('circle(' + S.lensR + 'px at ' + c.x + 'px ' + c.y + 'px)');
+      ring.style.left = cc.x + 'px'; ring.style.top = cc.y + 'px';
+      ring.style.width = ring.style.height = (S.lensR * 2) + 'px';
+    } else if (S.mode === 'swipe') {
+      var nw = map.containerPointToLayerPoint([0, 0]), se = map.containerPointToLayerPoint(size);
+      var sx = nw.x + size.x * S.swipe;
+      var x1 = S.swap ? sx : nw.x, x2 = S.swap ? se.x : sx;
+      setClip('polygon(' + x1 + 'px ' + nw.y + 'px,' + x2 + 'px ' + nw.y + 'px,' + x2 + 'px ' + se.y + 'px,' + x1 + 'px ' + se.y + 'px)');
+      handle.style.left = (size.x * S.swipe) + 'px';
+      handle.setAttribute('aria-valuenow', String(Math.round(S.swipe * 100)));
+    } else {
+      setClip('');
+    }
+  }
+  map.on('move zoom zoomend moveend resize viewreset', applyClip);
+
+  function updateLabels() {
+    var e = ERA[S.era], b = ERA[S.base];
+    $('lensLabel').textContent = e.label;
+    var oldTxt = '比較：' + e.label, nowTxt = '土台：' + b.label;
+    lblL.textContent = S.swap ? nowTxt : oldTxt;
+    lblR.textContent = S.swap ? oldTxt : nowTxt;
+  }
+
+
+  function setMode(m){
+    S.mode=m;
+    $('modes').querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.mode===m));});
+    eraPane.style.opacity=m==='blend'?String(S.opacity):'1';
+    eraPane.style.mixBlendMode=m==='blend'&&S.multiply?'multiply':'';
+    basePane.style.visibility=m==='timeline'?'hidden':'';
+    ring.hidden=m!=='lens';handle.hidden=m!=='swipe';lblL.hidden=lblR.hidden=m!=='swipe';
+    $('ctlLens').hidden=m!=='lens';$('ctlSwipe').hidden=m!=='swipe';$('ctlBlend').hidden=m!=='blend';$('ctlBase').hidden=m==='timeline';
+    applyGrab();applyClip();requestAnimationFrame(resizeAll);
+  }
+  function applyGrab(){var lock=S.mode==='lens'&&S.lensGrab;if(lock)map.dragging.disable();else map.dragging.enable();$('grabLens').setAttribute('aria-pressed',String(!!S.lensGrab));$('grabMap').setAttribute('aria-pressed',String(!S.lensGrab));}
+  function moveLens(ev){var r=mapEl.getBoundingClientRect(),y=ev.clientY-r.top;if(ev.pointerType&&ev.pointerType!=='mouse')y-=S.lensR*.5;lensLL=map.containerPointToLatLng([ev.clientX-r.left,y]);applyClip();}
+  function follows(ev){return S.mode==='lens'&&(ev.pointerType==='mouse'||S.lensGrab)&&!(ev.target.closest&&ev.target.closest('.leaflet-control,.leaflet-popup,.shapeLab'));}
+  mapEl.addEventListener('pointermove',function(ev){if(follows(ev)&&ev.isPrimary!==false)moveLens(ev);});
+  mapEl.addEventListener('pointerdown',function(ev){if(follows(ev)&&ev.isPrimary!==false)moveLens(ev);});
+  map.on('click',function(ev){if(S.mode==='lens'){lensLL=ev.latlng;applyClip();}});
+  (function(){var dragging=false;function upd(ev){var r=mapEl.getBoundingClientRect();S.swipe=Math.min(.97,Math.max(.03,(ev.clientX-r.left)/r.width));applyClip();}
+    handle.addEventListener('pointerdown',function(ev){dragging=true;handle.setPointerCapture(ev.pointerId);ev.preventDefault();upd(ev);});handle.addEventListener('pointermove',function(ev){if(dragging)upd(ev);});
+    ['pointerup','pointercancel','lostpointercapture'].forEach(function(type){handle.addEventListener(type,function(){dragging=false;});});
+    handle.addEventListener('keydown',function(ev){if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'){S.swipe=Math.min(.97,Math.max(.03,S.swipe+(ev.key==='ArrowLeft'?-.03:.03)));applyClip();ev.preventDefault();ev.stopPropagation();}});
+  })();
+  var LAYER_GROUPS=[{title:'昔の写真（4種）',layers:ERAS.slice(0,4)},{title:'いまの地図・写真（5種）',layers:ERAS.slice(4,9)},{title:'昔の地形図（9種）',layers:KJ_ERAS}];
+  ['eraSelect','baseSelect'].forEach(function(id){LAYER_GROUPS.forEach(function(group){var opt=h('optgroup',{label:group.title});group.layers.forEach(function(e){opt.append(h('option',{value:e.id,text:e.full}));});$(id).append(opt);});});
+  $('eraSelect').onchange=function(){setEra(this.value);};$('baseSelect').onchange=function(){setBase(this.value);};
+  $('modes').querySelectorAll('button').forEach(function(b){b.onclick=function(){setMode(b.dataset.mode);};});
+  $('lensR').value=S.lensR;$('lensRVal').textContent=S.lensR+'px';
+  $('lensR').oninput=function(){S.lensR=+this.value;$('lensRVal').textContent=S.lensR+'px';applyClip();};
+  $('grabLens').onclick=function(){S.lensGrab=true;applyGrab();};$('grabMap').onclick=function(){S.lensGrab=false;applyGrab();};
+  $('swapSides').onclick=function(){S.swap=!S.swap;updateLabels();applyClip();};
+  $('opacity').value=Math.round(S.opacity*100);$('opacityVal').textContent=$('opacity').value+'%';
+  $('opacity').oninput=function(){S.opacity=+this.value/100;$('opacityVal').textContent=this.value+'%';setMode(S.mode);};
+  $('multiply').setAttribute('aria-pressed',String(!!S.multiply));$('multiply').onclick=function(){S.multiply=!S.multiply;this.setAttribute('aria-pressed',String(S.multiply));setMode(S.mode);};
+  function updateShapeClips() {
+    shapeViews.forEach(function(v){
+      var coords=v.s.pts.map(function(p){return map.latLngToLayerPoint(p);});
+      var poly='polygon('+coords.map(function(q){return q.x+'px '+q.y+'px';}).join(',')+')';
+      var xs=coords.map(function(p){return p.x;}),ys=coords.map(function(p){return p.y;});
+      Object.assign(v.hatch.style,{left:Math.min.apply(null,xs)+'px',top:Math.min.apply(null,ys)+'px',width:(Math.max.apply(null,xs)-Math.min.apply(null,xs))+'px',height:(Math.max.apply(null,ys)-Math.min.apply(null,ys))+'px'});
+      v.pane.style.clipPath=poly; v.pane.style.webkitClipPath=poly;
+      v.pane.style.width=map.getSize().x+'px'; v.pane.style.height=map.getSize().y+'px';
+    });
+  }
+  map.on('move zoom moveend zoomend viewreset resize',updateShapeClips);
+  function labelIcon(s,i) {
+    var e=SE[s.era],box=h('div',{className:'in'});
+    box.style.borderColor=e.color;
+    if(S.shapeLabels==='number')box.append(h('b',{text:String(i+1)}));
+    else box.append(h('b',{className:'nm',text:s.name||'名前なし'}),h('div',{className:'er',text:e.label}));
+    return L.divIcon({className:'shapeLab',html:box,iconSize:null});
+  }
+
+  function popup(s){return h('div',{},[h('h3',{text:s.name||'名前なし'}),h('p',{text:SE[s.era].long}),h('p',{className:'shape-memo',text:s.memo||'メモはありません。'})]);}
+  function openShape(s,pos){L.popup().setLatLng(pos).setContent(popup(s)).openOn(map);}
+  function renderShapes(){
+    S.shapes.forEach(function(s,i){
+      if(s.hidden)return;
+      var pn='shape_'+s.id,group=map.createPane(pn+'_group');group.style.zIndex=String(260+i);group.style.pointerEvents='none';
+      var pane=map.createPane(pn,group),frame=map.createPane(pn+'_frame',group),labelPane=map.createPane(pn+'_label',group);pane.style.zIndex='0';frame.style.zIndex='1';labelPane.style.zIndex='2';pane.style.pointerEvents='none';
+      var hatch=h('div');Object.assign(hatch.style,{position:'absolute',zIndex:'0',background:'repeating-linear-gradient(45deg,#ddd 0 8px,#aaa 8px 16px)'});pane.append(hatch);
+      var v={s:s,pane:pane,hatch:hatch};v.layer=track(makeLayer(ERA[s.era],pn));
+      // 透明の塗りをヒット領域にして、輪郭だけでなく形の内部からもメモを開ける。
+      v.outline=L.polygon(s.pts,{pane:pn+'_frame',color:SE[s.era].color,weight:3,fill:true,fillOpacity:0,interactive:true,bubblingMouseEvents:false}).addTo(map);
+      v.outline.on('click',function(ev){openShape(s,ev.latlng);});
+      var pos=s.lab||v.outline.getBounds().getCenter();
+      if(S.shapeLabels!==false&&S.shapeLabels!=='none'){
+        v.label=L.marker(pos,{pane:pn+'_label',icon:labelIcon(s,i),draggable:false,keyboard:true,title:s.name,alt:s.name}).addTo(map);
+        v.label.on('click',function(){openShape(s,pos);});
+      }
+      shapeViews.push(v);updateShapeClips();v.layer.addTo(map);
+      var swatch=h('span',{className:'swatch','aria-hidden':'true'});swatch.style.borderColor=SE[s.era].color;
+      var item=h('button',{type:'button',className:'legend-item'},[swatch,h('span',{},[h('strong',{text:(i+1)+'. '+(s.name||'名前なし')}),h('small',{text:SE[s.era].long})])]);
+      item.onclick=function(){map.fitBounds(v.outline.getBounds(),{padding:[35,35],maxZoom:17,animate:false});openShape(s,pos);};$('legend').append(item);
+    });
+  }
+  function resizeAll(){map.invalidateSize({pan:false,animate:false});applyClip();updateShapeClips();}
+  function home(){resizeAll();var shapes=S.shapes.filter(function(s){return !s.hidden;});if(shapes.length)map.fitBounds(shapes.flatMap(function(s){return s.pts;}),{padding:[35,35],maxZoom:17,animate:false});else map.setView(CENTER,homeZoom());}
+  function reloadVisiblePhotos(){if(eraLayer)eraLayer.redraw();if(baseLayer)baseLayer.redraw();shapeViews.forEach(function(v){v.layer.redraw();});updateShapeClips();status();}
+  $('home').onclick=home;$('reload').onclick=reloadVisiblePhotos;
+  setBase(S.base);setEra(S.era);renderShapes();setMode(S.mode);home();
+  if(window.ResizeObserver)new ResizeObserver(resizeAll).observe(mapEl);else window.addEventListener('resize',resizeAll);
+  map.on('moveend',reloadVisiblePhotos);
+  window.addEventListener('online',reloadVisiblePhotos);window.addEventListener('offline',status);
+})();
+</script></body></html>
