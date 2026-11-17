@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>写真スワイプ 今⇔昔</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; color: #222; background: #fff; font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif; }
+  header { flex: none; padding: max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left)); border-bottom: 1px solid #ddd; }
+  h1 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+  #controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  button { font: inherit; color: inherit; cursor: pointer; min-height: 24px; padding: 0 8px; border: 1px solid #ddd; background: #fff; }
+  button[aria-pressed="true"] { border-color: #222; text-decoration: underline; text-underline-offset: 3px; }
+  button:disabled { cursor: wait; color: #666; }
+  button:focus-visible, #swipe:focus-visible { outline: 2px solid #222; outline-offset: 1px; }
+  #status, #note { font-size: 11px; color: #666; }
+  #status { margin-left: 4px; }
+  #note { margin: 4px 0 0; }
+  #mapwrap { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  #map { position: absolute; inset: 0; z-index: 0; background: #fff; touch-action: none; }
+  .leaflet-container { font: inherit; }
+  .leaflet-control-attribution { font-size: 10px; }
+  #swipe { position: absolute; z-index: 500; top: 0; bottom: 0; width: 48px; margin-left: -24px; cursor: ew-resize; touch-action: none; }
+  #swipe::before { content: ""; position: absolute; left: 23px; top: 0; bottom: 0; width: 2px; background: #222; }
+  #swipe .grip { position: absolute; left: 12px; top: 50%; width: 24px; height: 24px; margin-top: -12px; border-radius: 50%; background: #fff; color: #222; border: 1px solid #222; display: grid; place-items: center; font-size: 12px; }
+  .leaflet-right { right: env(safe-area-inset-right); }
+  .leaflet-left { left: env(safe-area-inset-left); }
+  @media(pointer:coarse) { button { min-height: 44px; } .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; } }
+</style></head><body>
+<header>
+<h1>写真スワイプ 今⇔昔</h1>
+<div id="controls" aria-label="比較する時代">
+<button type="button" data-era="ort_old10" aria-pressed="false">1961-69</button>
+<button type="button" data-era="gazo1" aria-pressed="false">1974-78</button>
+<button type="button" data-era="gazo2" aria-pressed="false">1979-83</button>
+<button type="button" data-era="gazo4" aria-pressed="true">1987-90</button>
+<button type="button" id="locate">現在地</button>
+<span id="status" role="status" aria-live="polite"></span>
+</div>
+<p id="note">左：現在／右：選択した時代。時代の写真がない地域・ズームでは右側が空白になります。</p>
+</header>
+<main id="mapwrap" aria-label="現在と昔の空中写真を比較する地図"><div id="map"></div>
+<div id="swipe" role="slider" tabindex="0" aria-label="比較の境界を左右に移動" aria-valuemin="3" aria-valuemax="97" aria-valuenow="50" aria-orientation="horizontal"><div class="grip" aria-hidden="true">↔</div></div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function(){'use strict';
+var $=function(id){return document.getElementById(id);};
+if(typeof L==='undefined'){$('status').textContent='地図を読み込めませんでした。接続を確認して再読み込みしてください。';$('swipe').hidden=true;document.querySelectorAll('button').forEach(function(b){b.disabled=true;});return;}
+// Source: viewer/index.html ETILE and time-tool-v2/index.html ERAS. These photos use XYZ, not Konjak TMS.
+var ERAS={ort_old10:{ext:'png',maxNative:17},gazo1:{ext:'jpg',maxNative:17},gazo2:{ext:'jpg',maxNative:17},gazo4:{ext:'jpg',maxNative:17}};
+var tile='https://cyberjapandata.gsi.go.jp/xyz/';
+var mapEl=$('map'),handle=$('swipe'),swipe=.5,pastLayer,currentLayer,locationMessage='';
+var map=L.map(mapEl,{center:[35.388,139.428],zoom:16,minZoom:0,maxZoom:18,zoomAnimation:false,fadeAnimation:false});
+map.attributionControl.setPrefix(false);
+map.attributionControl.addAttribution('出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院（地理院タイル）</a>');
+var pastPane=map.createPane('past');pastPane.style.zIndex='260';pastPane.style.pointerEvents='none';
+// The pane has no inherent size: maintain a white viewport-sized backing in layer coordinates.
+var blank=L.DomUtil.create('div','',pastPane);blank.style.position='absolute';blank.style.background='#fff';
+function updateStatus(){var layers=[currentLayer,pastLayer].filter(function(l){return l&&map.hasLayer(l);});$('status').textContent=locationMessage||(navigator.onLine===false?'オフラインです':layers.some(function(l){return l.isLoading();})?'写真を読み込み中…':layers.some(function(l){return l.failed.size;})?'写真の一部を取得できませんでした':'');}
+function track(layer){layer.failed=new Set();function key(e){return e.coords.z+'/'+e.coords.x+'/'+e.coords.y;}layer.on('loading load',updateStatus);layer.on('tileerror',function(e){e.tile.style.visibility='hidden';layer.failed.add(key(e));updateStatus();});layer.on('tileload tileunload',function(e){layer.failed.delete(key(e));updateStatus();});return layer;}
+currentLayer=track(L.tileLayer(tile+'seamlessphoto/{z}/{x}/{y}.jpg',{minZoom:0,maxZoom:18,maxNativeZoom:18,keepBuffer:1}));currentLayer.addTo(map);
+function applyClip(){var size=map.getSize(),nw=map.containerPointToLayerPoint([0,0]),se=map.containerPointToLayerPoint(size),x=nw.x+size.x*swipe;var c='polygon('+x+'px '+nw.y+'px,'+se.x+'px '+nw.y+'px,'+se.x+'px '+se.y+'px,'+x+'px '+se.y+'px)';pastPane.style.clipPath=pastPane.style.webkitClipPath=c;blank.style.left=nw.x+'px';blank.style.top=nw.y+'px';blank.style.width=size.x+'px';blank.style.height=size.y+'px';handle.style.left=size.x*swipe+'px';handle.setAttribute('aria-valuenow',String(Math.round(swipe*100)));}
+function setEra(id){if(!ERAS[id])return;if(!$('locate').disabled)locationMessage='';if(pastLayer)map.removeLayer(pastLayer);var e=ERAS[id];pastLayer=track(L.tileLayer(tile+id+'/{z}/{x}/{y}.'+e.ext,{pane:'past',minZoom:5,maxZoom:18,maxNativeZoom:e.maxNative,keepBuffer:1}));pastLayer.addTo(map);document.querySelectorAll('[data-era]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.era===id));});applyClip();updateStatus();}
+document.querySelectorAll('[data-era]').forEach(function(b){b.addEventListener('click',function(){setEra(b.dataset.era);});});
+(function(){var dragging=false;function update(ev){var r=mapEl.getBoundingClientRect();swipe=Math.min(.97,Math.max(.03,(ev.clientX-r.left)/r.width));applyClip();}handle.addEventListener('pointerdown',function(ev){if(ev.isPrimary===false||ev.button!==0)return;dragging=true;handle.setPointerCapture(ev.pointerId);ev.preventDefault();update(ev);});handle.addEventListener('pointermove',function(ev){if(dragging)update(ev);});['pointerup','pointercancel','lostpointercapture'].forEach(function(type){handle.addEventListener(type,function(){dragging=false;});});handle.addEventListener('keydown',function(ev){if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'||ev.key==='Home'||ev.key==='End'){swipe=ev.key==='Home'?.03:ev.key==='End'?.97:Math.min(.97,Math.max(.03,swipe+(ev.key==='ArrowLeft'?-.03:.03)));applyClip();ev.preventDefault();ev.stopPropagation();}});})();
+$('locate').addEventListener('click',function(){if(!navigator.geolocation){locationMessage='このブラウザは位置情報に対応していません';updateStatus();return;}var button=this;button.disabled=true;locationMessage='現在地を取得中…';updateStatus();navigator.geolocation.getCurrentPosition(function(pos){map.setView([pos.coords.latitude,pos.coords.longitude],Math.max(map.getZoom(),16));button.disabled=false;locationMessage='現在地へ移動しました';updateStatus();},function(error){button.disabled=false;locationMessage=error.code===1?'位置情報の利用が許可されませんでした':error.code===3?'現在地の取得がタイムアウトしました':'現在地を取得できませんでした';updateStatus();},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});});
+function resizeAll(){map.invalidateSize({pan:false,animate:false});applyClip();}
+map.on('move zoom zoomend moveend resize viewreset',applyClip);
+map.on('movestart',function(){if(!$('locate').disabled){locationMessage='';updateStatus();}});
+if(window.ResizeObserver)new ResizeObserver(resizeAll).observe(mapEl);else window.addEventListener('resize',resizeAll);
+window.addEventListener('online',function(){[currentLayer,pastLayer].forEach(function(l){l.failed.clear();l.redraw();});updateStatus();});window.addEventListener('offline',updateStatus);
+setEra('gazo4');
+})();
+</script></body></html>
